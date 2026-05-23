@@ -21,9 +21,6 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// Раздача статических файлов Web-панели
-	r.Handle("/*", http.FileServer(http.Dir("./static/web")))
-
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/organizations", h.GetOrganizations)
 		r.Post("/organizations", h.CreateOrganization)
@@ -37,6 +34,9 @@ func main() {
 		r.Get("/sync", h.GetSyncChanges)
 		r.Post("/sync", h.PushSyncChanges)
 	})
+
+	// Раздача статических файлов Web-панели (fallback)
+	r.Handle("/*", http.FileServer(http.Dir("./static/web")))
 
 	log.Println("Starting server on :8080...")
 	if err := http.ListenAndServe(":8080", r); err != nil {

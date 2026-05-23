@@ -1,0 +1,6 @@
+2026/05/23 11:59:59 Starting server on :8080...
+2026/05/23 12:00:03 "HEAD http://localhost:8080/ HTTP/1.1" from [::1]:54840 - 200 0B in 17.912277ms
+2026/05/23 12:00:03 "HEAD http://localhost:8080/saas.html HTTP/1.1" from [::1]:54854 - 200 0B in 59.708µs
+2026/05/23 12:00:03 "HEAD http://localhost:8080/api/v1/projects HTTP/1.1" from [::1]:54870 - 405 0B in 24.714µs
+2026/05/23 12:01:05 "HEAD http://localhost:8080/api/v1/projects HTTP/1.1" from [::1]:42456 - 405 0B in 31.848µs
+2026/05/23 12:01:05 "HEAD http://localhost:8080/index.html HTTP/1.1" from [::1]:42462 - 301 0B in 27.143µs
