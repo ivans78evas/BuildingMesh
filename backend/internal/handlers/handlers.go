@@ -27,6 +27,29 @@ func (h *Handler) GetProjects(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(projects)
 }
 
+func (h *Handler) GetOrganizations(w http.ResponseWriter, r *http.Request) {
+	orgs, err := h.repo.GetOrganizations()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(orgs)
+}
+
+func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) {
+	var o models.Organization
+	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	o.ID = uuid.New().String()
+	if err := h.repo.CreateOrganization(o); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(o)
+}
+
 func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	var p models.Project
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {

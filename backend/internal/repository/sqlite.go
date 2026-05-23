@@ -30,6 +30,12 @@ func NewRepository(dbPath string) (*Repository, error) {
 
 func (r *Repository) initSchema() error {
 	schema := `
+	CREATE TABLE IF NOT EXISTS organizations (
+		id TEXT PRIMARY KEY,
+		name TEXT,
+		google_api_key TEXT
+	);
+
 	CREATE TABLE IF NOT EXISTS projects (
 		id TEXT PRIMARY KEY,
 		name TEXT,
@@ -122,6 +128,30 @@ func (r *Repository) CreateProject(p models.Project) error {
 	_, err := r.db.Exec("INSERT INTO projects (id, name, address, created_at) VALUES (?, ?, ?, ?)",
 		p.ID, p.Name, p.Address, p.CreatedAt)
 	return err
+}
+
+func (r *Repository) CreateOrganization(o models.Organization) error {
+	_, err := r.db.Exec("INSERT INTO organizations (id, name, google_api_key) VALUES (?, ?, ?)",
+		o.ID, o.Name, o.GoogleAPIKey)
+	return err
+}
+
+func (r *Repository) GetOrganizations() ([]models.Organization, error) {
+	rows, err := r.db.Query("SELECT id, name, google_api_key FROM organizations")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orgs []models.Organization
+	for rows.Next() {
+		var o models.Organization
+		if err := rows.Scan(&o.ID, &o.Name, &o.GoogleAPIKey); err != nil {
+			return nil, err
+		}
+		orgs = append(orgs, o)
+	}
+	return orgs, nil
 }
 
 func (r *Repository) GetWallDetails(wallID string) (*models.Wall, []models.Layer, error) {
