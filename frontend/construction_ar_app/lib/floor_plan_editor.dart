@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
-import 'dart:ui' as ui;
 
 class FloorPlanEditor extends StatefulWidget {
   final String imagePath;

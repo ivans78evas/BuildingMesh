@@ -36,7 +36,7 @@ class _AdvancedAROverlayState extends State<AdvancedAROverlay> {
     // Визуализация объектов обнаруженных RuView (через ESP32-S3)
     final ghost = ArCoreNode(
       shape: ArCoreSphere(
-        materials: [ArCoreMaterial(color: Colors.red.withOpacity(0.5))],
+        materials: [ArCoreMaterial(color: Colors.red.withValues(alpha: 0.5))],
         radius: 0.3,
       ),
       position: vector.Vector3(1, 1, -3), // Объект за стеной

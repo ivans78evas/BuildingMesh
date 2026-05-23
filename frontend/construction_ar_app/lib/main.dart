@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:construction_ar_app/advanced_ar_overlay.dart';
 import 'package:construction_ar_app/project_map.dart';
+import 'package:construction_ar_app/settings_page.dart';
 
 void main() {
   runApp(const ConstructionApp());
@@ -32,7 +33,10 @@ class DashboardPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Мои Объекты'),
         actions: [
-          IconButton(icon: const Icon(Icons.person), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SettingsPage())),
+          ),
         ],
       ),
       body: GridView.count(

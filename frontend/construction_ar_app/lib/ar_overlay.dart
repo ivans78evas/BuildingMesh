@@ -30,16 +30,6 @@ class _ARWallOverlayState extends State<ARWallOverlay> {
     controller.addArCoreNode(node);
   }
 
-  void _addVirtualWall(vector.Vector3 position, vector.Vector3 size) {
-    final wallNode = ArCoreNode(
-      shape: ArCoreCube(
-        materials: [ArCoreMaterial(color: Colors.red.withOpacity(0.3))],
-        size: size,
-      ),
-      position: position,
-    );
-    arCoreController.addArCoreNode(wallNode);
-  }
 
   @override
   Widget build(BuildContext context) {

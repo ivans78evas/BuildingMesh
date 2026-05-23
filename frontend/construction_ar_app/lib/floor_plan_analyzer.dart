@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 
 class CVWallDetector {
@@ -66,7 +65,7 @@ class DetectionPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.green.withOpacity(0.5)
+      ..color = Colors.green.withValues(alpha: 0.5)
       ..style = PaintingStyle.fill;
 
     for (var rect in rects) {
