@@ -3,6 +3,9 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"construction-ar-backend/internal/handlers"
 	"construction-ar-backend/internal/repository"
 	"github.com/go-chi/chi/v5"
@@ -10,6 +13,26 @@ import (
 )
 
 func main() {
+	// 1. Поиск папки статики
+	workDir, _ := os.Getwd()
+	possiblePaths := []string{
+		filepath.Join(workDir, "static", "web"),
+		filepath.Join(workDir, "backend", "static", "web"),
+		"/workspaces/BuildingMesh/backend/static/web",
+	}
+
+	staticDir := ""
+	for _, p := range possiblePaths {
+		if info, err := os.Stat(p); err == nil && info.IsDir() {
+			staticDir = p
+			break
+		}
+	}
+
+	log.Printf("Starting server...")
+	log.Printf("Working Directory: %s", workDir)
+	log.Printf("Static Directory: %s", staticDir)
+
 	repo, err := repository.NewRepository("construction.db")
 	if err != nil {
 		log.Fatal(err)
@@ -21,6 +44,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	// API Маршруты
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/organizations", h.GetOrganizations)
 		r.Post("/organizations", h.CreateOrganization)
@@ -35,12 +59,26 @@ func main() {
 		r.Post("/sync", h.PushSyncChanges)
 	})
 
-	// Раздача статических файлов Web-панели (fallback)
-	// Используем абсолютный путь для надежности
-	fs := http.FileServer(http.Dir("./static/web"))
-	r.Handle("/*", fs)
+	// Статика
+	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/v1") {
+			return
+		}
 
-	log.Println("Starting server on :8080...")
+		path := filepath.Join(staticDir, r.URL.Path)
+		if r.URL.Path == "/" || r.URL.Path == "" {
+			path = filepath.Join(staticDir, "index.html")
+		}
+
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
+			return
+		}
+
+		http.ServeFile(w, r, path)
+	})
+
+	log.Println("Server running on :8080...")
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)
 	}
