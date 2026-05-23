@@ -4,3 +4,5 @@
 2026/05/23 12:00:03 "HEAD http://localhost:8080/api/v1/projects HTTP/1.1" from [::1]:54870 - 405 0B in 24.714µs
 2026/05/23 12:01:05 "HEAD http://localhost:8080/api/v1/projects HTTP/1.1" from [::1]:42456 - 405 0B in 31.848µs
 2026/05/23 12:01:05 "HEAD http://localhost:8080/index.html HTTP/1.1" from [::1]:42462 - 301 0B in 27.143µs
+2026/05/23 12:40:10 "HEAD http://localhost:8080/ HTTP/1.1" from [::1]:35660 - 200 0B in 4.900202ms
+2026/05/23 12:41:48 "HEAD http://localhost:8080/ HTTP/1.1" from [::1]:47274 - 200 0B in 694.241µs

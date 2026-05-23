@@ -36,7 +36,9 @@ func main() {
 	})
 
 	// Раздача статических файлов Web-панели (fallback)
-	r.Handle("/*", http.FileServer(http.Dir("./static/web")))
+	// Используем абсолютный путь для надежности
+	fs := http.FileServer(http.Dir("./static/web"))
+	r.Handle("/*", fs)
 
 	log.Println("Starting server on :8080...")
 	if err := http.ListenAndServe(":8080", r); err != nil {
