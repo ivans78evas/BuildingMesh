@@ -17,7 +17,12 @@
 - **Инженер/Рабочий**: AR X-Ray ("прозрачные стены").
 
 ## Установка и запуск
-1. **Backend**:
+1. **Быстрый деплой на сервер (Debian 13)**:
+   ```bash
+   chmod +x deploy_server.sh
+   ./deploy_server.sh
+   ```
+2. **Backend (Вручную)**:
    \`\`\`bash
    cd backend
    go run cmd/server/main.go
