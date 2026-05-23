@@ -27,6 +27,11 @@
    cd backend
    go run cmd/server/main.go
    \`\`\`
+3. **Перезапуск сервера**:
+   \`\`\`bash
+   chmod +x restart.sh
+   ./restart.sh
+   \`\`\`
 2. **Frontend**:
    \`\`\`bash
    cd frontend/construction_ar_app
