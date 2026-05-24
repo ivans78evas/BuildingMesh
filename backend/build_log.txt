@@ -1,0 +1,22 @@
+internal/cache/cache.go:8:2: no required module provides package github.com/redis/go-redis/v9; to add it:
+	go get github.com/redis/go-redis/v9
+internal/config/config.go:7:2: no required module provides package github.com/joho/godotenv; to add it:
+	go get github.com/joho/godotenv
+internal/logger/logger.go:4:2: no required module provides package go.uber.org/zap; to add it:
+	go get go.uber.org/zap
+internal/logger/logger.go:5:2: no required module provides package go.uber.org/zap/zapcore; to add it:
+	go get go.uber.org/zap/zapcore
+internal/queue/queue.go:9:2: no required module provides package github.com/rabbitmq/amqp091-go; to add it:
+	go get github.com/rabbitmq/amqp091-go
+internal/middleware/ratelimit.go:7:2: no required module provides package golang.org/x/time/rate; to add it:
+	go get golang.org/x/time/rate
+cmd/server/main.go:23:2: no required module provides package github.com/go-chi/cors; to add it:
+	go get github.com/go-chi/cors
+cmd/server/main.go:24:2: no required module provides package github.com/golang-migrate/migrate/v4; to add it:
+	go get github.com/golang-migrate/migrate/v4
+cmd/server/main.go:25:2: no required module provides package github.com/golang-migrate/migrate/v4/database/sqlite3; to add it:
+	go get github.com/golang-migrate/migrate/v4/database/sqlite3
+cmd/server/main.go:26:2: no required module provides package github.com/golang-migrate/migrate/v4/source/file; to add it:
+	go get github.com/golang-migrate/migrate/v4/source/file
+cmd/server/main.go:27:2: no required module provides package github.com/swaggo/http-swagger; to add it:
+	go get github.com/swaggo/http-swagger
