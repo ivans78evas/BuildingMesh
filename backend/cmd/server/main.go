@@ -1,19 +1,19 @@
 package main
 
 import (
+	"construction-ar-backend/internal/handlers"
+	"construction-ar-backend/internal/repository"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"construction-ar-backend/internal/handlers"
-	"construction-ar-backend/internal/repository"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {
-	// 1. Инициализация БД
 	repo, err := repository.NewRepository("construction.db")
 	if err != nil {
 		log.Fatal(err)
@@ -25,10 +25,8 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// 2. API Эндпоинты
+	// API эндпоинты
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/organizations", h.GetOrganizations)
-		r.Post("/organizations", h.CreateOrganization)
 		r.Get("/projects", h.GetProjects)
 		r.Post("/projects", h.CreateProject)
 		r.Get("/walls/{wallID}", h.GetWall)
@@ -40,38 +38,28 @@ func main() {
 		r.Post("/sync", h.PushSyncChanges)
 	})
 
-	// 3. Настройка статики для Codespaces
+	// Раздача статики для веб-морды (SPA)
 	workDir, _ := os.Getwd()
-	staticDir := filepath.Join(workDir, "static", "web")
-
-	// Если папка не найдена в текущем пути (backend/), ищем в корне/backend/...
-	if _, err := os.Stat(staticDir); os.IsNotExist(err) {
-		staticDir = "/workspaces/BuildingMesh/backend/static/web"
+	// Determine correct web directory path
+	webDir := filepath.Join(workDir, "cmd/server/web")
+	if _, err := os.Stat(webDir); os.IsNotExist(err) {
+		webDir = filepath.Join(workDir, "backend/cmd/server/web")
 	}
 
-	log.Printf("Terminal started. Static directory: %s", staticDir)
+	filesDir := http.Dir(webDir)
 
-	// 4. Раздача статики
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/v1") {
+		// Если запрашивается файл с расширением (js, css и т.д.), отдаем его
+		if strings.Contains(r.URL.Path, ".") {
+			http.FileServer(filesDir).ServeHTTP(w, r)
 			return
 		}
-
-		path := filepath.Join(staticDir, r.URL.Path)
-		if r.URL.Path == "/" || r.URL.Path == "" {
-			path = filepath.Join(staticDir, "index.html")
-		}
-
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			// Fallback на index.html для SPA роутинга
-			http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
-			return
-		}
-
-		http.ServeFile(w, r, path)
+		// Для всех остальных путей (SPA роутинг) отдаем index.html
+		http.ServeFile(w, r, filepath.Join(webDir, "index.html"))
 	})
 
-	log.Println("Server listening on :8080")
+	log.Println("Starting server on :8080...")
+	log.Printf("Web directory: %s", webDir)
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)
 	}

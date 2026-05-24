@@ -15,7 +15,7 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-primary); color: var(--text-main); margin: 0; }
         .mono { font-family: 'JetBrains Mono', monospace; }
         .bm-sidebar { background: var(--bg-secondary); border-right: 1px solid var(--border-color); }
-        .bm-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; }
+        .bm-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; }
         .bm-btn-primary { background: rgba(0, 229, 255, 0.1); color: var(--accent-blue); border: 1px solid var(--accent-blue); padding: 8px 20px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; transition: all 0.2s; }
         .bm-btn-primary:hover { background: var(--accent-blue); color: #000; box-shadow: 0 0 15px rgba(0, 229, 255, 0.4); }
         .bm-input { background: #06070a; border: 1px solid var(--border-color); color: white; padding: 12px; border-radius: 4px; width: 100%; outline: none; }
@@ -35,11 +35,9 @@
 
             useEffect(() => { loadProjects(); }, []);
             const loadProjects = async () => {
-                try {
-                    const res = await fetch('/api/v1/projects');
-                    const data = await res.json();
-                    setProjects(data || []);
-                } catch (e) { console.error(e); }
+                const res = await fetch('/api/v1/projects');
+                const data = await res.json();
+                setProjects(data || []);
             };
             const handleCreate = async (e) => {
                 e.preventDefault();
@@ -61,7 +59,7 @@
                             <span className="font-bold text-lg tracking-tighter uppercase mono">Building<span className="text-cyan-500">Mesh</span></span>
                         </div>
                         <nav className="space-y-1">
-                            <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-4 px-4 py-3 rounded transition ${view === 'dashboard' ? 'bg-cyan-500/5 text-cyan-400 border-l-2 border-cyan-500' : 'text-slate-500 hover:text-slate-200'} text-sm font-semibold`}>Project Registry</button>
+                            <button onClick={() => setView('dashboard')} className="w-full flex items-center gap-4 px-4 py-3 rounded transition bg-cyan-500/5 text-cyan-400 border-l-2 border-cyan-500 text-sm font-semibold text-left">Project Registry</button>
                         </nav>
                     </aside>
                     <main className="flex-1 overflow-auto p-12">
