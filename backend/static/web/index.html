@@ -1,9 +1,113 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head><meta charset="UTF-8"><title>Owner Dashboard</title></head>
-<body style="background:#0a0b14;color:white;font-family:sans-serif;padding:50px;">
-    <h1 style="color:#3b82f6;">BuildPro: Owner Dashboard</h1>
-    <p>Система мониторинга строительства запущена.</p>
-    <a href="/saas.html" style="color:#60a5fa;">SaaS Manager Dashboard</a>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BuildingMesh | Engineering Console</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        :root { --bg-primary: #0a0b10; --bg-secondary: #13151c; --accent-blue: #00e5ff; --border-color: #222632; --text-main: #e2e8f0; --text-dim: #94a3b8; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-primary); color: var(--text-main); margin: 0; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .bm-sidebar { background: var(--bg-secondary); border-right: 1px solid var(--border-color); }
+        .bm-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; }
+        .bm-btn-primary { background: rgba(0, 229, 255, 0.1); color: var(--accent-blue); border: 1px solid var(--accent-blue); padding: 8px 20px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; transition: all 0.2s; }
+        .bm-btn-primary:hover { background: var(--accent-blue); color: #000; box-shadow: 0 0 15px rgba(0, 229, 255, 0.4); }
+        .bm-input { background: #06070a; border: 1px solid var(--border-color); color: white; padding: 12px; border-radius: 4px; width: 100%; outline: none; }
+        table thead th { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
+        table tbody td { padding: 16px; border-bottom: 1px solid rgba(34, 38, 50, 0.5); font-size: 0.875rem; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const App = () => {
+            const [view, setView] = useState('dashboard');
+            const [projects, setProjects] = useState([]);
+            const [selectedProject, setSelectedProject] = useState(null);
+            const [isModalOpen, setIsModalOpen] = useState(false);
+
+            useEffect(() => { loadProjects(); }, []);
+            const loadProjects = async () => {
+                try {
+                    const res = await fetch('/api/v1/projects');
+                    const data = await res.json();
+                    setProjects(data || []);
+                } catch (e) { console.error(e); }
+            };
+            const handleCreate = async (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                await fetch('/api/v1/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: fd.get('name'), address: fd.get('address') })
+                });
+                setIsModalOpen(false);
+                loadProjects();
+            };
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    <aside className="w-72 bm-sidebar flex flex-col p-8">
+                        <div className="flex items-center gap-3 mb-12">
+                            <div className="w-10 h-10 border-2 border-cyan-500 rounded-sm flex items-center justify-center transform rotate-45"><i className="fas fa-layer-group text-cyan-500 transform -rotate-45 text-sm"></i></div>
+                            <span className="font-bold text-lg tracking-tighter uppercase mono">Building<span className="text-cyan-500">Mesh</span></span>
+                        </div>
+                        <nav className="space-y-1">
+                            <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-4 px-4 py-3 rounded transition ${view === 'dashboard' ? 'bg-cyan-500/5 text-cyan-400 border-l-2 border-cyan-500' : 'text-slate-500 hover:text-slate-200'} text-sm font-semibold`}>Project Registry</button>
+                        </nav>
+                    </aside>
+                    <main className="flex-1 overflow-auto p-12">
+                        {view === 'dashboard' ? (
+                            <div className="max-w-7xl mx-auto">
+                                <div className="flex justify-between items-end mb-12">
+                                    <h1 className="text-4xl font-bold uppercase mono">Projects Registry</h1>
+                                    <button onClick={() => setIsModalOpen(true)} className="bm-btn-primary">Initialize New Object</button>
+                                </div>
+                                <div className="bm-card"><table className="w-full text-left"><thead><tr><th>ID</th><th>Project Name</th><th>Location</th><th>Deployment</th><th className="text-right">Action</th></tr></thead>
+                                <tbody>{projects.map(p => (
+                                    <tr key={p.id} className="hover:bg-white/[0.02] transition">
+                                        <td className="mono text-xs text-cyan-500/60 uppercase">{p.id.split('-')[0]}</td>
+                                        <td className="font-bold">{p.name}</td>
+                                        <td className="text-slate-500">{p.address || 'UNDEFINED'}</td>
+                                        <td className="text-slate-600 mono text-xs">{new Date(p.created_at).toISOString().split('T')[0]}</td>
+                                        <td className="text-right"><button onClick={() => { setSelectedProject(p); setView('details'); }} className="text-xs font-bold uppercase text-cyan-500">Access Console</button></td>
+                                    </tr>
+                                ))}</tbody></table></div>
+                            </div>
+                        ) : (
+                            <div className="max-w-6xl mx-auto">
+                                <button onClick={() => setView('dashboard')} className="mb-12 text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-white"><i className="fas fa-arrow-left mr-2"></i> Back</button>
+                                <h2 className="text-5xl font-black uppercase italic mb-8">{selectedProject.name}</h2>
+                                <div className="grid grid-cols-2 gap-10">
+                                    <div className="bm-card p-10"><h3 className="font-bold text-sm uppercase text-cyan-500 mb-8">Spatial Data Scan (.PLY)</h3><div className="border border-dashed border-slate-800 p-12 text-center text-slate-600 uppercase text-[10px] font-bold">Drop PLY here</div><button className="bm-btn-primary w-full mt-8">Upload</button></div>
+                                    <div className="bm-card p-10"><h3 className="font-bold text-sm uppercase text-cyan-500 mb-8">Architectural Plan</h3><div className="border border-dashed border-slate-800 p-12 text-center text-slate-600 uppercase text-[10px] font-bold">Select PNG/PDF</div><button className="bm-btn-primary w-full mt-8">Upload</button></div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                    {isModalOpen && (
+                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+                            <div className="bm-card w-full max-w-xl p-12"><h2 className="text-3xl font-black uppercase italic mb-8">Initialize Object</h2>
+                            <form onSubmit={handleCreate} className="space-y-8">
+                                <input name="name" required className="bm-input" placeholder="Object Name" />
+                                <input name="address" required className="bm-input" placeholder="Location Address" />
+                                <div className="flex gap-4"><button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 text-slate-500 uppercase font-bold text-xs">Abort</button><button type="submit" className="flex-1 bm-btn-primary">Finalize</button></div>
+                            </form></div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>

@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	// 1. Инициализация репозитория
+	// 1. Инициализация БД
 	repo, err := repository.NewRepository("construction.db")
 	if err != nil {
 		log.Fatal(err)
@@ -40,22 +40,19 @@ func main() {
 		r.Post("/sync", h.PushSyncChanges)
 	})
 
-	// 3. Определение пути к статическим файлам
+	// 3. Настройка статики для Codespaces
 	workDir, _ := os.Getwd()
 	staticDir := filepath.Join(workDir, "static", "web")
 
-	// Если папка не найдена локально, ищем в подпапке backend (для запуска из корня)
+	// Если папка не найдена в текущем пути (backend/), ищем в корне/backend/...
 	if _, err := os.Stat(staticDir); os.IsNotExist(err) {
-		staticDir = filepath.Join(workDir, "backend", "static", "web")
+		staticDir = "/workspaces/BuildingMesh/backend/static/web"
 	}
 
-	log.Printf("BuildPro Server Starting...")
-	log.Printf("Working Directory: %s", workDir)
-	log.Printf("Static Directory: %s", staticDir)
+	log.Printf("Terminal started. Static directory: %s", staticDir)
 
-	// 4. Раздача статики (Fallback для SPA)
+	// 4. Раздача статики
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		// Игнорируем API префиксы
 		if strings.HasPrefix(r.URL.Path, "/api/v1") {
 			return
 		}
@@ -65,8 +62,8 @@ func main() {
 			path = filepath.Join(staticDir, "index.html")
 		}
 
-		// Если файл не существует, отдаем index.html (для маршрутизации фронтенда)
 		if _, err := os.Stat(path); os.IsNotExist(err) {
+			// Fallback на index.html для SPA роутинга
 			http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
 			return
 		}
@@ -74,7 +71,7 @@ func main() {
 		http.ServeFile(w, r, path)
 	})
 
-	log.Println("Слушаю порт :8080")
+	log.Println("Server listening on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)
 	}
