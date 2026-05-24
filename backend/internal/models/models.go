@@ -2,22 +2,22 @@ package models
 
 import "time"
 
+
 type Project struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Address     string    `json:"address"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	OrganizationID string    `json:"organization_id"`
+	Name           string    `json:"name"`
+	Address        string    `json:"address"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type Wall struct {
-	ID        string  `json:"id"`
-	ProjectID string  `json:"project_id"`
-	Name      string  `json:"name"`
-	Thickness float64 `json:"thickness"`
-	// Координаты относительно опорной точки (щитка)
-	PositionX float64 `json:"pos_x"`
-	PositionY float64 `json:"pos_y"`
-	PositionZ float64 `json:"pos_z"`
+	ID        string    `json:"id"`
+	ProjectID string    `json:"project_id"`
+	Name      string    `json:"name"`
+	Type      string    `json:"type"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Layer struct {
@@ -26,16 +26,7 @@ type Layer struct {
 	Name      string  `json:"name"`
 	Material  string  `json:"material"`
 	Thickness float64 `json:"thickness"`
-	Order     int     `json:"order"` // Порядок слоя внутри стены
-}
-
-type Installation struct {
-	ID        string `json:"id"`
-	ProjectID string `json:"project_id"`
-	Type      string `json:"type"` // e.g., "pipe", "cable"
-	Name      string `json:"name"`
-	// Геометрия в упрощенном виде или ссылка на GLB
-	GLBPath string `json:"glb_path"`
+	Order     int     `json:"order"`
 }
 
 type Splat struct {
@@ -51,6 +42,20 @@ type FloorPlan struct {
 	ProjectID string    `json:"project_id"`
 	Name      string    `json:"name"`
 	ImagePath string    `json:"image_path"`
-	Scale     float64   `json:"scale"` // пикселей на метр
+	Scale     float64   `json:"scale"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type Issue struct {
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"project_id"`
+	X           float64   `json:"x"`
+	Y           float64   `json:"y"`
+	Z           float64   `json:"z"`
+	Status      string    `json:"status"`   // Open, InProgress, Resolved, Closed
+	Priority    string    `json:"priority"` // Low, Medium, High
+	Description string    `json:"description"`
+	Creator     string    `json:"creator"`
+	Assignee    string    `json:"assignee"`
+	CreatedAt   time.Time `json:"created_at"`
 }

@@ -20,94 +20,15 @@ func NewRepository(dbPath string) (*Repository, error) {
 		return nil, err
 	}
 
-	repo := &Repository{db: db}
-	if err := repo.initSchema(); err != nil {
-		return nil, err
-	}
-
-	return repo, nil
+	return &Repository{db: db}, nil
 }
 
-func (r *Repository) initSchema() error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS organizations (
-		id TEXT PRIMARY KEY,
-		name TEXT,
-		google_api_key TEXT
-	);
-
-	CREATE TABLE IF NOT EXISTS projects (
-		id TEXT PRIMARY KEY,
-		name TEXT,
-		address TEXT,
-		created_at DATETIME
-	);
-
-	CREATE TABLE IF NOT EXISTS walls (
-		id TEXT PRIMARY KEY,
-		project_id TEXT,
-		name TEXT,
-		thickness REAL,
-		pos_x REAL,
-		pos_y REAL,
-		pos_z REAL,
-		FOREIGN KEY(project_id) REFERENCES projects(id)
-	);
-
-	CREATE TABLE IF NOT EXISTS layers (
-		id TEXT PRIMARY KEY,
-		wall_id TEXT,
-		name TEXT,
-		material TEXT,
-		thickness REAL,
-		"order" INTEGER,
-		FOREIGN KEY(wall_id) REFERENCES walls(id)
-	);
-
-	CREATE TABLE IF NOT EXISTS installations (
-		id TEXT PRIMARY KEY,
-		project_id TEXT,
-		type TEXT,
-		name TEXT,
-		glb_path TEXT,
-		FOREIGN KEY(project_id) REFERENCES projects(id)
-	);
-
-	CREATE TABLE IF NOT EXISTS splats (
-		id TEXT PRIMARY KEY,
-		project_id TEXT,
-		name TEXT,
-		file_path TEXT,
-		created_at DATETIME,
-		FOREIGN KEY(project_id) REFERENCES projects(id)
-	);
-
-	CREATE TABLE IF NOT EXISTS floor_plans (
-		id TEXT PRIMARY KEY,
-		project_id TEXT,
-		name TEXT,
-		image_path TEXT,
-		scale REAL,
-		created_at DATETIME,
-		FOREIGN KEY(project_id) REFERENCES projects(id)
-	);
-
-	CREATE TABLE IF NOT EXISTS sync_log (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		client_id TEXT,
-		table_name TEXT,
-		record_id TEXT,
-		operation TEXT, -- 'INSERT', 'UPDATE', 'DELETE'
-		data TEXT,
-		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
-	`
-	_, err := r.db.Exec(schema)
-	return err
+func (r *Repository) DB() *sql.DB {
+	return r.db
 }
 
 func (r *Repository) GetProjects() ([]models.Project, error) {
-	rows, err := r.db.Query("SELECT id, name, address, created_at FROM projects")
+	rows, err := r.db.Query("SELECT id, organization_id, name, address, created_at FROM projects")
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +37,7 @@ func (r *Repository) GetProjects() ([]models.Project, error) {
 	var projects []models.Project
 	for rows.Next() {
 		var p models.Project
-		if err := rows.Scan(&p.ID, &p.Name, &p.Address, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.OrganizationID, &p.Name, &p.Address, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		projects = append(projects, p)
@@ -125,19 +46,19 @@ func (r *Repository) GetProjects() ([]models.Project, error) {
 }
 
 func (r *Repository) CreateProject(p models.Project) error {
-	_, err := r.db.Exec("INSERT INTO projects (id, name, address, created_at) VALUES (?, ?, ?, ?)",
-		p.ID, p.Name, p.Address, p.CreatedAt)
+	_, err := r.db.Exec("INSERT INTO projects (id, organization_id, name, address, created_at) VALUES (?, ?, ?, ?, ?)",
+		p.ID, p.OrganizationID, p.Name, p.Address, p.CreatedAt)
 	return err
 }
 
 func (r *Repository) CreateOrganization(o models.Organization) error {
-	_, err := r.db.Exec("INSERT INTO organizations (id, name, google_api_key) VALUES (?, ?, ?)",
-		o.ID, o.Name, o.GoogleAPIKey)
+	_, err := r.db.Exec("INSERT INTO organizations (id, name, created_at) VALUES (?, ?, ?)",
+		o.ID, o.Name, o.CreatedAt)
 	return err
 }
 
 func (r *Repository) GetOrganizations() ([]models.Organization, error) {
-	rows, err := r.db.Query("SELECT id, name, google_api_key FROM organizations")
+	rows, err := r.db.Query("SELECT id, name, created_at FROM organizations")
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +67,7 @@ func (r *Repository) GetOrganizations() ([]models.Organization, error) {
 	var orgs []models.Organization
 	for rows.Next() {
 		var o models.Organization
-		if err := rows.Scan(&o.ID, &o.Name, &o.GoogleAPIKey); err != nil {
+		if err := rows.Scan(&o.ID, &o.Name, &o.CreatedAt); err != nil {
 			return nil, err
 		}
 		orgs = append(orgs, o)
@@ -156,8 +77,8 @@ func (r *Repository) GetOrganizations() ([]models.Organization, error) {
 
 func (r *Repository) GetWallDetails(wallID string) (*models.Wall, []models.Layer, error) {
 	var w models.Wall
-	err := r.db.QueryRow("SELECT id, project_id, name, thickness, pos_x, pos_y, pos_z FROM walls WHERE id = ?", wallID).
-		Scan(&w.ID, &w.ProjectID, &w.Name, &w.Thickness, &w.PositionX, &w.PositionY, &w.PositionZ)
+	err := r.db.QueryRow("SELECT id, project_id, name, type, status, created_at FROM walls WHERE id = ?", wallID).
+		Scan(&w.ID, &w.ProjectID, &w.Name, &w.Type, &w.Status, &w.CreatedAt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -178,36 +99,6 @@ func (r *Repository) GetWallDetails(wallID string) (*models.Wall, []models.Layer
 	}
 
 	return &w, layers, nil
-}
-
-func (r *Repository) CreateWall(w models.Wall) error {
-	_, err := r.db.Exec("INSERT INTO walls (id, project_id, name, thickness, pos_x, pos_y, pos_z) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		w.ID, w.ProjectID, w.Name, w.Thickness, w.PositionX, w.PositionY, w.PositionZ)
-	return err
-}
-
-func (r *Repository) CreateLayer(l models.Layer) error {
-	_, err := r.db.Exec("INSERT INTO layers (id, wall_id, name, material, thickness, \"order\") VALUES (?, ?, ?, ?, ?, ?)",
-		l.ID, l.WallID, l.Name, l.Material, l.Thickness, l.Order)
-	return err
-}
-
-func (r *Repository) GetInstallations(projectID string) ([]models.Installation, error) {
-	rows, err := r.db.Query("SELECT id, project_id, type, name, glb_path FROM installations WHERE project_id = ?", projectID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var installations []models.Installation
-	for rows.Next() {
-		var i models.Installation
-		if err := rows.Scan(&i.ID, &i.ProjectID, &i.Type, &i.Name, &i.GLBPath); err != nil {
-			return nil, err
-		}
-		installations = append(installations, i)
-	}
-	return installations, nil
 }
 
 func (r *Repository) CreateSplat(s models.Splat) error {
@@ -256,4 +147,41 @@ func (r *Repository) GetFloorPlans(projectID string) ([]models.FloorPlan, error)
 		plans = append(plans, fp)
 	}
 	return plans, nil
+}
+
+func (r *Repository) CreateIssue(i models.Issue) error {
+	_, err := r.db.Exec("INSERT INTO issues (id, project_id, x, y, z, status, priority, description, creator, assignee, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		i.ID, i.ProjectID, i.X, i.Y, i.Z, i.Status, i.Priority, i.Description, i.Creator, i.Assignee, i.CreatedAt)
+	return err
+}
+
+func (r *Repository) GetIssues(projectID string) ([]models.Issue, error) {
+	rows, err := r.db.Query("SELECT id, project_id, x, y, z, status, priority, description, creator, assignee, created_at FROM issues WHERE project_id = ?", projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var issues []models.Issue
+	for rows.Next() {
+		var i models.Issue
+		if err := rows.Scan(&i.ID, &i.ProjectID, &i.X, &i.Y, &i.Z, &i.Status, &i.Priority, &i.Description, &i.Creator, &i.Assignee, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		issues = append(issues, i)
+	}
+	return issues, nil
+}
+
+func (r *Repository) UpdateIssueStatus(id string, status string) error {
+	_, err := r.db.Exec("UPDATE issues SET status = ? WHERE id = ?", status, id)
+	return err
+}
+
+func (r *Repository) Ping() error {
+	return r.db.Ping()
+}
+
+func (r *Repository) Close() error {
+	return r.db.Close()
 }

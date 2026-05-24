@@ -1,0 +1,8 @@
+-- 000001_init_schema.down.sql
+DROP TABLE IF EXISTS issues;
+DROP TABLE IF EXISTS floor_plans;
+DROP TABLE IF EXISTS splats;
+DROP TABLE IF EXISTS layers;
+DROP TABLE IF EXISTS walls;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS organizations;
