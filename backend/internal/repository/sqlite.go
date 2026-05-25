@@ -75,10 +75,22 @@ func (r *Repository) GetOrganizations() ([]models.Organization, error) {
 	return orgs, nil
 }
 
+func (r *Repository) CreateWall(w models.Wall) error {
+	_, err := r.db.Exec("INSERT INTO walls (id, project_id, name, type, status, thickness, pos_x, pos_y, pos_z, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		w.ID, w.ProjectID, w.Name, w.Type, w.Status, w.Thickness, w.PositionX, w.PositionY, w.PositionZ, w.CreatedAt)
+	return err
+}
+
+func (r *Repository) CreateLayer(l models.Layer) error {
+	_, err := r.db.Exec("INSERT INTO layers (id, wall_id, name, material, thickness, \"order\") VALUES (?, ?, ?, ?, ?, ?)",
+		l.ID, l.WallID, l.Name, l.Material, l.Thickness, l.Order)
+	return err
+}
+
 func (r *Repository) GetWallDetails(wallID string) (*models.Wall, []models.Layer, error) {
 	var w models.Wall
-	err := r.db.QueryRow("SELECT id, project_id, name, type, status, created_at FROM walls WHERE id = ?", wallID).
-		Scan(&w.ID, &w.ProjectID, &w.Name, &w.Type, &w.Status, &w.CreatedAt)
+	err := r.db.QueryRow("SELECT id, project_id, name, type, status, thickness, pos_x, pos_y, pos_z, created_at FROM walls WHERE id = ?", wallID).
+		Scan(&w.ID, &w.ProjectID, &w.Name, &w.Type, &w.Status, &w.Thickness, &w.PositionX, &w.PositionY, &w.PositionZ, &w.CreatedAt)
 	if err != nil {
 		return nil, nil, err
 	}

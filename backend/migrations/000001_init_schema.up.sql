@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS walls (
     name TEXT NOT NULL,
     type TEXT,
     status TEXT,
+    thickness REAL,
+    pos_x REAL,
+    pos_y REAL,
+    pos_z REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (project_id) REFERENCES projects(id)
 );

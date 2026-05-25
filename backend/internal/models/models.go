@@ -17,6 +17,10 @@ type Wall struct {
 	Name      string    `json:"name"`
 	Type      string    `json:"type"`
 	Status    string    `json:"status"`
+	Thickness float64   `json:"thickness"`
+	PositionX float64   `json:"pos_x"`
+	PositionY float64   `json:"pos_y"`
+	PositionZ float64   `json:"pos_z"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
