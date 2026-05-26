@@ -3,6 +3,22 @@ package models
 import "time"
 
 
+type Organization struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Plan      string    `json:"plan"` // Free, Pro, Enterprise
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type User struct {
+	ID             string    `json:"id"`
+	OrganizationID string    `json:"organization_id"`
+	Email          string    `json:"email"`
+	FullName       string    `json:"full_name"`
+	Role           string    `json:"role"` // Superadmin, Admin, Engineer, Viewer
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 type Project struct {
 	ID             string    `json:"id"`
 	OrganizationID string    `json:"organization_id"`

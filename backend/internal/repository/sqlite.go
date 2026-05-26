@@ -52,13 +52,13 @@ func (r *Repository) CreateProject(p models.Project) error {
 }
 
 func (r *Repository) CreateOrganization(o models.Organization) error {
-	_, err := r.db.Exec("INSERT INTO organizations (id, name, created_at) VALUES (?, ?, ?)",
-		o.ID, o.Name, o.CreatedAt)
+	_, err := r.db.Exec("INSERT INTO organizations (id, name, plan, created_at) VALUES (?, ?, ?, ?)",
+		o.ID, o.Name, o.Plan, o.CreatedAt)
 	return err
 }
 
 func (r *Repository) GetOrganizations() ([]models.Organization, error) {
-	rows, err := r.db.Query("SELECT id, name, created_at FROM organizations")
+	rows, err := r.db.Query("SELECT id, name, plan, created_at FROM organizations")
 	if err != nil {
 		return nil, err
 	}
@@ -67,12 +67,36 @@ func (r *Repository) GetOrganizations() ([]models.Organization, error) {
 	var orgs []models.Organization
 	for rows.Next() {
 		var o models.Organization
-		if err := rows.Scan(&o.ID, &o.Name, &o.CreatedAt); err != nil {
+		if err := rows.Scan(&o.ID, &o.Name, &o.Plan, &o.CreatedAt); err != nil {
 			return nil, err
 		}
 		orgs = append(orgs, o)
 	}
 	return orgs, nil
+}
+
+func (r *Repository) CreateUser(u models.User) error {
+	_, err := r.db.Exec("INSERT INTO users (id, organization_id, email, full_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+		u.ID, u.OrganizationID, u.Email, u.FullName, u.Role, u.CreatedAt)
+	return err
+}
+
+func (r *Repository) GetUsersByOrg(orgID string) ([]models.User, error) {
+	rows, err := r.db.Query("SELECT id, organization_id, email, full_name, role, created_at FROM users WHERE organization_id = ?", orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.OrganizationID, &u.Email, &u.FullName, &u.Role, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, nil
 }
 
 func (r *Repository) CreateWall(w models.Wall) error {

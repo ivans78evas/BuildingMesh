@@ -25,6 +25,91 @@ func NewHandler(repo *repository.Repository, q *queue.Queue, c *cache.Cache) *Ha
 	return &Handler{repo: repo, queue: q, cache: c}
 }
 
+// @Summary Get all organizations
+// @Description Get list of all organizations (Superadmin only)
+// @Tags Admin
+// @Produce json
+// @Success 200 {array} models.Organization
+// @Router /organizations [get]
+func (h *Handler) GetOrganizations(w http.ResponseWriter, r *http.Request) {
+	orgs, err := h.repo.GetOrganizations()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(orgs)
+}
+
+// @Summary Create organization
+// @Description Register a new company/firm
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param org body models.Organization true "Organization object"
+// @Success 201 {object} models.Organization
+// @Router /organizations [post]
+func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) {
+	var o models.Organization
+	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	o.ID = uuid.New().String()
+	o.CreatedAt = time.Now()
+	if o.Plan == "" {
+		o.Plan = "Free"
+	}
+
+	if err := h.repo.CreateOrganization(o); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(o)
+}
+
+// @Summary Get users by organization
+// @Description Get list of users for a specific firm
+// @Tags Admin
+// @Produce json
+// @Param orgID path string true "Organization ID"
+// @Success 200 {array} models.User
+// @Router /organizations/{orgID}/users [get]
+func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
+	orgID := chi.URLParam(r, "orgID")
+	users, err := h.repo.GetUsersByOrg(orgID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(users)
+}
+
+// @Summary Create user
+// @Description Add a user to an organization
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param user body models.User true "User object"
+// @Success 201 {object} models.User
+// @Router /users [post]
+func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	var u models.User
+	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	u.ID = uuid.New().String()
+	u.CreatedAt = time.Now()
+
+	if err := h.repo.CreateUser(u); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(u)
+}
+
 // @Summary Get all projects
 // @Description Get list of all projects
 // @Tags Projects

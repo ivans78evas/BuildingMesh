@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "construction-ar-backend/docs"
 	"construction-ar-backend/internal/cache"
 	"construction-ar-backend/internal/config"
 	"construction-ar-backend/internal/handlers"
@@ -82,6 +83,12 @@ func main() {
 
 	// API Routes
 	r.Route("/api/v1", func(r chi.Router) {
+		// Admin/SaaS Routes
+		r.Get("/organizations", h.GetOrganizations)
+		r.Post("/organizations", h.CreateOrganization)
+		r.Get("/organizations/{orgID}/users", h.GetUsers)
+		r.Post("/users", h.CreateUser)
+
 		r.Get("/projects", h.GetProjects)
 		r.Post("/projects", h.CreateProject)
 		r.Get("/walls/{wallID}", h.GetWall)
@@ -100,7 +107,7 @@ func main() {
 	})
 
 	// Swagger
-	r.Get("/api/docs/*", httpSwagger.WrapHandler)
+	r.Get("/api/docs/*", httpSwagger.Handler(httpSwagger.URL("/api/docs/doc.json")))
 
 	// Static & SPA
 	workDir, _ := os.Getwd()
