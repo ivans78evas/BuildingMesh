@@ -6,8 +6,28 @@ import "time"
 type Organization struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
-	Plan      string    `json:"plan"` // Free, Pro, Enterprise
+	Domain    string    `json:"domain"`
+	Plan      string    `json:"plan"`   // Free, Pro, Enterprise
+	Status    string    `json:"status"` // Active, Suspended, Trial
+	MaxProjects int     `json:"max_projects"`
+	MaxUsers    int     `json:"max_users"`
+	MaxIoTHubs  int     `json:"max_iot_hubs"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type IoTStats struct {
+	RPS           float64 `json:"rps"`
+	ActiveDevices int     `json:"active_devices"`
+	TotalEvents   int64   `json:"total_events"`
+	ErrorCount    int     `json:"error_count"`
+}
+
+type SystemLog struct {
+	ID        string    `json:"id"`
+	Level     string    `json:"level"`
+	Message   string    `json:"message"`
+	Source    string    `json:"source"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 type User struct {

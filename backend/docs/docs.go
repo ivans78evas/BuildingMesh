@@ -45,6 +45,93 @@ const docTemplate = `{
                 }
             }
         },
+        "/organizations": {
+            "get": {
+                "description": "Get list of all organizations (Superadmin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get all organizations",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Organization"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Register a new company/firm",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Create organization",
+                "parameters": [
+                    {
+                        "description": "Organization object",
+                        "name": "org",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Organization"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.Organization"
+                        }
+                    }
+                }
+            }
+        },
+        "/organizations/{orgID}/users": {
+            "get": {
+                "description": "Get list of users for a specific firm",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get users by organization",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization ID",
+                        "name": "orgID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.User"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/projects": {
             "get": {
                 "description": "Get list of all projects",
@@ -214,6 +301,81 @@ const docTemplate = `{
                 }
             }
         },
+        "/saas/iot/stats": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SaaS"
+                ],
+                "summary": "Get IoT Stats (Superadmin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.IoTStats"
+                        }
+                    }
+                }
+            }
+        },
+        "/saas/logs": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SaaS"
+                ],
+                "summary": "Get System Logs (Superadmin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.SystemLog"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users": {
+            "post": {
+                "description": "Add a user to an organization",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Create user",
+                "parameters": [
+                    {
+                        "description": "User object",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.User"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.User"
+                        }
+                    }
+                }
+            }
+        },
         "/walls/{wallID}": {
             "get": {
                 "description": "Get details of a specific wall including layers",
@@ -245,6 +407,23 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "models.IoTStats": {
+            "type": "object",
+            "properties": {
+                "active_devices": {
+                    "type": "integer"
+                },
+                "error_count": {
+                    "type": "integer"
+                },
+                "rps": {
+                    "type": "number"
+                },
+                "total_events": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.Issue": {
             "type": "object",
             "properties": {
@@ -282,6 +461,23 @@ const docTemplate = `{
                 },
                 "z": {
                     "type": "number"
+                }
+            }
+        },
+        "models.Organization": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "google_api_key": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
@@ -324,6 +520,64 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "models.SystemLog": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.User": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "role": {
+                    "$ref": "#/definitions/models.UserRole"
+                }
+            }
+        },
+        "models.UserRole": {
+            "type": "string",
+            "enum": [
+                "owner",
+                "pm",
+                "architect",
+                "foreman",
+                "specialist",
+                "worker",
+                "client"
+            ],
+            "x-enum-varnames": [
+                "RoleOwner",
+                "RolePM",
+                "RoleArchitect",
+                "RoleForeman",
+                "RoleSpecialist",
+                "RoleWorker",
+                "RoleClient"
+            ]
         }
     }
 }`

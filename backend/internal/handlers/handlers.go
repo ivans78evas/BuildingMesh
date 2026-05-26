@@ -85,6 +85,34 @@ func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(users)
 }
 
+// @Summary Get IoT Stats (Superadmin)
+// @Tags SaaS
+// @Produce json
+// @Success 200 {object} models.IoTStats
+// @Router /saas/iot/stats [get]
+func (h *Handler) GetIoTStats(w http.ResponseWriter, r *http.Request) {
+	stats := models.IoTStats{
+		RPS:           124.5,
+		ActiveDevices: 42,
+		TotalEvents:   1540230,
+		ErrorCount:    12,
+	}
+	json.NewEncoder(w).Encode(stats)
+}
+
+// @Summary Get System Logs (Superadmin)
+// @Tags SaaS
+// @Produce json
+// @Success 200 {array} models.SystemLog
+// @Router /saas/logs [get]
+func (h *Handler) GetSystemLogs(w http.ResponseWriter, r *http.Request) {
+	logs := []models.SystemLog{
+		{ID: "1", Level: "ERROR", Message: "Unauthorized ESP32 connection attempt from 192.168.1.45", Source: "RuView-GW", Timestamp: time.Now()},
+		{ID: "2", Level: "INFO", Message: "New organization 'Alpha Dev' provisioned", Source: "SaaS-Core", Timestamp: time.Now().Add(-5 * time.Minute)},
+	}
+	json.NewEncoder(w).Encode(logs)
+}
+
 // @Summary Create user
 // @Description Add a user to an organization
 // @Tags Admin

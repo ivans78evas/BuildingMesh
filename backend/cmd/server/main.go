@@ -88,6 +88,8 @@ func main() {
 		r.Post("/organizations", h.CreateOrganization)
 		r.Get("/organizations/{orgID}/users", h.GetUsers)
 		r.Post("/users", h.CreateUser)
+		r.Get("/saas/iot/stats", h.GetIoTStats)
+		r.Get("/saas/logs", h.GetSystemLogs)
 
 		r.Get("/projects", h.GetProjects)
 		r.Post("/projects", h.CreateProject)

@@ -1,4 +1,15 @@
 definitions:
+  models.IoTStats:
+    properties:
+      active_devices:
+        type: integer
+      error_count:
+        type: integer
+      rps:
+        type: number
+      total_events:
+        type: integer
+    type: object
   models.Issue:
     properties:
       assignee:
@@ -26,6 +37,17 @@ definitions:
       z:
         type: number
     type: object
+  models.Organization:
+    properties:
+      created_at:
+        type: string
+      google_api_key:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
   models.Project:
     properties:
       address:
@@ -52,6 +74,48 @@ definitions:
       project_id:
         type: string
     type: object
+  models.SystemLog:
+    properties:
+      id:
+        type: string
+      level:
+        type: string
+      message:
+        type: string
+      source:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  models.User:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      org_id:
+        type: string
+      role:
+        $ref: '#/definitions/models.UserRole'
+    type: object
+  models.UserRole:
+    enum:
+    - owner
+    - pm
+    - architect
+    - foreman
+    - specialist
+    - worker
+    - client
+    type: string
+    x-enum-varnames:
+    - RoleOwner
+    - RolePM
+    - RoleArchitect
+    - RoleForeman
+    - RoleSpecialist
+    - RoleWorker
+    - RoleClient
 info:
   contact: {}
 paths:
@@ -75,6 +139,63 @@ paths:
       summary: Update issue status
       tags:
       - Issues
+  /organizations:
+    get:
+      description: Get list of all organizations (Superadmin only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Organization'
+            type: array
+      summary: Get all organizations
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      description: Register a new company/firm
+      parameters:
+      - description: Organization object
+        in: body
+        name: org
+        required: true
+        schema:
+          $ref: '#/definitions/models.Organization'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Organization'
+      summary: Create organization
+      tags:
+      - Admin
+  /organizations/{orgID}/users:
+    get:
+      description: Get list of users for a specific firm
+      parameters:
+      - description: Organization ID
+        in: path
+        name: orgID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.User'
+            type: array
+      summary: Get users by organization
+      tags:
+      - Admin
   /projects:
     get:
       description: Get list of all projects
@@ -188,6 +309,54 @@ paths:
       summary: Upload point cloud (.ply)
       tags:
       - 3D
+  /saas/iot/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.IoTStats'
+      summary: Get IoT Stats (Superadmin)
+      tags:
+      - SaaS
+  /saas/logs:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.SystemLog'
+            type: array
+      summary: Get System Logs (Superadmin)
+      tags:
+      - SaaS
+  /users:
+    post:
+      consumes:
+      - application/json
+      description: Add a user to an organization
+      parameters:
+      - description: User object
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.User'
+      summary: Create user
+      tags:
+      - Admin
   /walls/{wallID}:
     get:
       description: Get details of a specific wall including layers

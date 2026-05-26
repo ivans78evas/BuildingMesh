@@ -1,4 +1,0 @@
-# ./backend/...
-pattern ./backend/...: directory prefix backend does not contain main module or its selected dependencies
-FAIL	./backend/... [setup failed]
-FAIL

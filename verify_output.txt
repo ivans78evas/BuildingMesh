@@ -1,3 +1,0 @@
-Navigating to http://localhost:8080
-Page title: BuildingMesh | Engineering Console
-Screenshot saved to verification_result.png
