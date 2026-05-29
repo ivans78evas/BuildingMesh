@@ -3,6 +3,9 @@ backend/construction_server
 backend/construction.db
 backend/*.log
 backend/output.log
+build/
+server.log
+data/
 
 # Flutter
 .dart_tool/
@@ -14,6 +17,16 @@ frontend/construction_ar_app/build/
 frontend/construction_ar_app/.dart_tool/
 frontend/construction_ar_app/.packages
 frontend/construction_ar_app/pubspec.lock
+frontend/construction_ar_app/android/
+frontend/construction_ar_app/ios/
+
+# Verification & Artifacts
+*.png
+*.webm
+videos/
+verification/
+verify_*.js
+verify_*.py
 
 # OS
 .DS_Store

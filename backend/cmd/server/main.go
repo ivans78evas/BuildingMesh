@@ -23,7 +23,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	httpSwagger "github.com/swaggo/http-swagger"
 	"go.uber.org/zap"
@@ -83,29 +83,58 @@ func main() {
 
 	// API Routes
 	r.Route("/api/v1", func(r chi.Router) {
-		// Admin/SaaS Routes
-		r.Get("/organizations", h.GetOrganizations)
-		r.Post("/organizations", h.CreateOrganization)
-		r.Get("/organizations/{orgID}/users", h.GetUsers)
-		r.Post("/users", h.CreateUser)
-		r.Get("/saas/iot/stats", h.GetIoTStats)
-		r.Get("/saas/logs", h.GetSystemLogs)
-
-		r.Get("/projects", h.GetProjects)
-		r.Post("/projects", h.CreateProject)
-		r.Get("/walls/{wallID}", h.GetWall)
-
-		r.Group(func(r chi.Router) {
-			r.Use(middleware.RateLimit(limiter))
-			r.Post("/projects/{projectID}/splats", h.UploadSplat)
-		})
-
-		r.Get("/projects/{projectID}/issues", h.GetIssues)
-		r.Post("/projects/{projectID}/issues", h.CreateIssue)
-		r.Patch("/issues/{id}/status", h.PatchIssueStatus)
-
+		r.Post("/login", h.Login)
 		r.Get("/health/live", h.HealthLive)
 		r.Get("/health/ready", h.HealthReady)
+
+		// Protected Routes
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Auth)
+
+			r.Get("/me", h.Me)
+
+			// Admin/SaaS Routes (Superadmin only)
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.RequireRole("Superadmin"))
+				r.Get("/organizations", h.GetOrganizations)
+				r.Post("/organizations", h.CreateOrganization)
+				r.Get("/saas/iot/stats", h.GetIoTStats)
+				r.Get("/saas/logs", h.GetSystemLogs)
+			})
+
+			// Project & Inspection Routes (Admin, Engineer)
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.RequireRole("Superadmin", "Admin", "Engineer"))
+
+				r.Get("/projects", h.GetProjects)
+				r.Post("/projects", h.CreateProject)
+				r.Get("/organizations/{orgID}/users", h.GetUsers)
+				r.Post("/users", h.CreateUser)
+				r.Get("/organizations/{orgID}/usage", h.GetOrgUsage)
+
+				// BIM & Time-Machine
+				r.Get("/projects/{projectID}/elements", h.GetBIMElements)
+				r.Get("/elements/{elementID}/layers", h.GetTemporalLayers)
+				r.Post("/elements/{elementID}/layers", h.CreateTemporalLayer)
+
+				// Inspection Commits (Git-like)
+				r.Get("/elements/{elementID}/commits", h.GetInspectionCommits)
+				r.Post("/commits", h.CreateInspectionCommit)
+				r.Patch("/commits/{id}", h.UpdateInspectionCommit)
+
+				r.Get("/walls/{wallID}/comparison", h.GetWallComparison)
+
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RateLimit(limiter))
+					r.Post("/projects/{projectID}/splats", h.UploadSplat)
+				})
+
+				r.Get("/projects/{projectID}/issues", h.GetIssues)
+				r.Post("/projects/{projectID}/issues", h.CreateIssue)
+				r.Patch("/issues/{id}/status", h.PatchIssueStatus)
+				r.Get("/projects/{projectID}/export", h.ExportProjectPDF)
+			})
+		})
 	})
 
 	// Swagger
@@ -157,14 +186,14 @@ func main() {
 }
 
 func runMigrations(repo *repository.Repository, migrationDir string) {
-	driver, err := sqlite3.WithInstance(repo.DB(), &sqlite3.Config{})
+	driver, err := sqlite.WithInstance(repo.DB(), &sqlite.Config{})
 	if err != nil {
 		logger.Log.Fatal("Migration driver error", zap.Error(err))
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
 		fmt.Sprintf("file://%s", migrationDir),
-		"sqlite3", driver)
+		"sqlite", driver)
 	if err != nil {
 		logger.Log.Fatal("Migration init error", zap.Error(err))
 	}

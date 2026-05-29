@@ -4,15 +4,17 @@ import "time"
 
 
 type Organization struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Domain    string    `json:"domain"`
-	Plan      string    `json:"plan"`   // Free, Pro, Enterprise
-	Status    string    `json:"status"` // Active, Suspended, Trial
-	MaxProjects int     `json:"max_projects"`
-	MaxUsers    int     `json:"max_users"`
-	MaxIoTHubs  int     `json:"max_iot_hubs"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Domain       string    `json:"domain"`
+	Plan         string    `json:"plan"`   // Free, Pro, Enterprise
+	Status       string    `json:"status"` // Active, Suspended, Trial
+	MaxProjects  int       `json:"max_projects"`
+	MaxUsers     int       `json:"max_users"`
+	MaxIoTHubs   int       `json:"max_iot_hubs"`
+	PrimaryColor string    `json:"primary_color"` // White labeling
+	LogoURL      string    `json:"logo_url"`      // White labeling
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type IoTStats struct {
@@ -83,6 +85,15 @@ type FloorPlan struct {
 	Name      string    `json:"name"`
 	ImagePath string    `json:"image_path"`
 	Scale     float64   `json:"scale"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type BIMModel struct {
+	ID        string    `json:"id"`
+	ProjectID string    `json:"project_id"`
+	Name      string    `json:"name"`
+	FilePath  string    `json:"file_path"`
+	Type      string    `json:"type"` // IFC, RVT, DXF
 	CreatedAt time.Time `json:"created_at"`
 }
 

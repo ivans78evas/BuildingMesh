@@ -1,501 +1,299 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BuildingMesh | Engineering Console</title>
+    <title>BuildingMesh | Enterprise Deep Control</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
-        :root { --bg-primary: #0a0b10; --bg-secondary: #13151c; --accent-blue: #00e5ff; --border-color: #222632; --text-main: #e2e8f0; --text-dim: #94a3b8; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-primary); color: var(--text-main); margin: 0; }
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
+        :root { --primary: #2563eb; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #020617; color: #f8fafc; margin: 0; overflow: hidden; }
         .mono { font-family: 'JetBrains Mono', monospace; }
-        .bm-sidebar { background: var(--bg-secondary); border-right: 1px solid var(--border-color); }
-        .bm-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; }
-        .bm-btn-primary { background: rgba(0, 229, 255, 0.1); color: var(--accent-blue); border: 1px solid var(--accent-blue); padding: 8px 20px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; transition: all 0.2s; }
-        .bm-btn-primary:hover { background: var(--accent-blue); color: #000; box-shadow: 0 0 15px rgba(0, 229, 255, 0.4); }
-        .bm-input { background: #06070a; border: 1px solid var(--border-color); color: white; padding: 12px; border-radius: 4px; width: 100%; outline: none; }
-        table thead th { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
-        table tbody td { padding: 16px; border-bottom: 1px solid rgba(34, 38, 50, 0.5); font-size: 0.875rem; }
-        .nav-item-active { background: rgba(0, 229, 255, 0.05); color: var(--accent-blue); border-bottom: 2px solid var(--accent-blue); }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: var(--bg-primary); }
-        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+        .bg-tenant { background-color: var(--primary); }
+        .text-tenant { color: var(--primary); }
+        .border-tenant { border-color: var(--primary); }
+        .accent-tenant { accent-color: var(--primary); }
+
+        input[type="range"]::-webkit-scrollbar { display: none; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
+
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            50% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .scan-line {
+            height: 2px;
+            background: linear-gradient(to right, transparent, var(--primary), transparent);
+            position: absolute;
+            width: 100%;
+            z-index: 20;
+            animation: scan 3s linear infinite;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
+
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
-        const Toast = ({ message, type, onClose }) => {
+        // --- 3D Viewer Component ---
+        const ThreeDViewer = ({ step = 3, primaryColor = '#2563eb' }) => {
+            const mountRef = useRef(null);
+            const rendererRef = useRef(null);
+            const sceneRef = useRef(null);
+            const wallRef = useRef(null);
+            const pipesRef = useRef(null);
+
             useEffect(() => {
-                const timer = setTimeout(onClose, 3000);
-                return () => clearTimeout(timer);
-            }, [onClose]);
+                const width = mountRef.current.clientWidth;
+                const height = mountRef.current.clientHeight;
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 
-            const colors = {
-                success: 'bg-green-500/20 border-green-500 text-green-400',
-                error: 'bg-red-500/20 border-red-500 text-red-400',
-                info: 'bg-cyan-500/20 border-cyan-500 text-cyan-400'
-            };
+                renderer.setSize(width, height);
+                mountRef.current.appendChild(renderer.domElement);
+                rendererRef.current = renderer;
+                sceneRef.current = scene;
 
-            return (
-                <div className={`fixed bottom-8 right-8 px-6 py-4 border rounded shadow-2xl z-[100] flex items-center gap-3 animate-bounce-short ${colors[type] || colors.info}`}>
-                    <i className={`fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle'}`}></i>
-                    <span className="text-xs font-bold uppercase tracking-wider">{message}</span>
-                </div>
-            );
+                const grid = new THREE.GridHelper(20, 20, 0x1e293b, 0x0f172a);
+                scene.add(grid);
+                scene.add(new THREE.AmbientLight(0x404040, 2));
+                const light = new THREE.DirectionalLight(0xffffff, 1);
+                light.position.set(10, 10, 10);
+                scene.add(light);
+
+                const wallGeo = new THREE.BoxGeometry(4, 3, 0.3);
+                const wallMat = new THREE.MeshPhongMaterial({ color: 0x888888, transparent: true, opacity: 0.8 });
+                const wall = new THREE.Mesh(wallGeo, wallMat);
+                wall.position.y = 1.5;
+                scene.add(wall);
+                wallRef.current = wall;
+
+                const pipeGroup = new THREE.Group();
+                const pipeMat = new THREE.MeshPhongMaterial({ color: primaryColor, emissive: primaryColor, emissiveIntensity: 0.2 });
+                for(let i = 0; i < 3; i++) {
+                    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3), pipeMat);
+                    p.position.set(-1.2 + (i * 1.2), 1.5, 0);
+                    pipeGroup.add(p);
+                }
+                scene.add(pipeGroup);
+                pipesRef.current = pipeGroup;
+
+                camera.position.set(4, 3, 4);
+                camera.lookAt(0, 1.2, 0);
+
+                const animate = () => {
+                    requestAnimationFrame(animate);
+                    scene.rotation.y += 0.001;
+                    renderer.render(scene, camera);
+                };
+                animate();
+
+                const handleResize = () => {
+                    const w = mountRef.current.clientWidth;
+                    const h = mountRef.current.clientHeight;
+                    renderer.setSize(w, h);
+                    camera.aspect = w / h;
+                    camera.updateProjectionMatrix();
+                };
+                window.addEventListener('resize', handleResize);
+                return () => {
+                    window.removeEventListener('resize', handleResize);
+                    mountRef.current?.removeChild(renderer.domElement);
+                };
+            }, []);
+
+            useEffect(() => {
+                if (!wallRef.current || !pipesRef.current) return;
+                const configs = {
+                    1: { color: 0x666666, opacity: 1.0, pipes: false },
+                    2: { color: 0x444444, opacity: 0.3, pipes: true },
+                    3: { color: 0x888888, opacity: 0.8, pipes: true }
+                };
+                const c = configs[step] || configs[3];
+                wallRef.current.material.color.setHex(c.color);
+                wallRef.current.material.opacity = c.opacity;
+                pipesRef.current.visible = c.pipes;
+            }, [step]);
+
+            return <div ref={mountRef} className="w-full h-full" />;
         };
 
+        // --- Auth Provider (Simplified) ---
         const App = () => {
-            const [role, setRole] = useState('engineer'); // 'engineer' or 'superadmin'
-            const [view, setView] = useState('dashboard');
-            const [subView, setSubView] = useState('ingestion');
-            const [projects, setProjects] = useState([]);
-            const [organizations, setOrganizations] = useState([]);
-            const [orgSearch, setOrgSearch] = useState('');
-            const [selectedProject, setSelectedProject] = useState(null);
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
-            const [selectedWall, setSelectedWall] = useState(null);
-            const [toasts, setToasts] = useState([]);
-            const [uploading, setUploading] = useState(false);
-            const [iotStats, setIotStats] = useState(null);
-            const [sysLogs, setSysLogs] = useState([]);
-
-            const fileInputRef = useRef(null);
-            const planInputRef = useRef(null);
+            const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
+            const [token, setToken] = useState(localStorage.getItem('token'));
+            const [org, setOrg] = useState(null);
+            const [view, setView] = useState('engineering');
+            const [step, setStep] = useState(3);
+            const [isScanning, setIsScanning] = useState(false);
 
             useEffect(() => {
-                loadProjects();
-                if (role === 'superadmin') {
-                    loadOrgs();
-                    loadIotStats();
-                    loadSysLogs();
-                }
-            }, [role]);
+                if (token) fetchOrg();
+            }, [token]);
 
-            const addToast = (message, type = 'info') => {
-                const id = Date.now();
-                setToasts(prev => [...prev, { id, message, type }]);
-            };
-
-            const removeToast = (id) => {
-                setToasts(prev => prev.filter(t => t.id !== id));
-            };
-
-            const loadProjects = async () => {
+            const fetchOrg = async () => {
                 try {
-                    const res = await fetch('/api/v1/projects');
+                    const res = await fetch('/api/v1/organizations', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
                     const data = await res.json();
-                    setProjects(data || []);
-                } catch (e) {
-                    setProjects([{id: 'p1', name: 'ТЕСТОВЫЙ ОБЪЕКТ', address: 'УЛ. СТРОИТЕЛЕЙ, 1', created_at: new Date()}]);
-                }
+                    if (data && data.length > 0) {
+                        setOrg(data[0]);
+                        document.documentElement.style.setProperty('--primary', data[0].primary_color || '#2563eb');
+                    }
+                } catch (e) { console.error(e); }
             };
 
-            const loadOrgs = async () => {
-                try {
-                    const res = await fetch('/api/v1/organizations');
-                    const data = await res.json();
-                    setOrganizations(data || []);
-                } catch (e) {
-                    setOrganizations([
-                        {id: 'org1', name: 'Alpha Development', domain: 'alpha.dev', plan: 'Enterprise', status: 'Active', max_projects: 50, max_users: 200, created_at: new Date()},
-                        {id: 'org2', name: 'Beta Construct', domain: 'beta.com', plan: 'Pro', status: 'Trial', max_projects: 5, max_users: 20, created_at: new Date()}
-                    ]);
-                }
-            };
-
-            const loadIotStats = async () => {
-                try {
-                    const res = await fetch('/api/v1/saas/iot/stats');
-                    const data = await res.json();
-                    setIotStats(data);
-                } catch (e) {}
-            };
-
-            const loadSysLogs = async () => {
-                try {
-                    const res = await fetch('/api/v1/saas/logs');
-                    const data = await res.json();
-                    setSysLogs(data && data.length ? data : [
-                        {id: "1", level: "ERROR", message: "Unauthorized ESP32 connection attempt from 192.168.1.45", source: "RuView-GW", timestamp: new Date().toISOString()},
-                        {id: "2", level: "INFO", message: "New organization 'Alpha Dev' provisioned", source: "SaaS-Core", timestamp: new Date().toISOString()}
-                    ]);
-                } catch (e) {
-                    setSysLogs([
-                        {id: "1", level: "ERROR", message: "Unauthorized ESP32 connection attempt from 192.168.1.45", source: "RuView-GW", timestamp: new Date().toISOString()},
-                        {id: "2", level: "INFO", message: "New organization 'Alpha Dev' provisioned", source: "SaaS-Core", timestamp: new Date().toISOString()}
-                    ]);
-                }
-            };
-
-            const handleCreateOrg = async (e) => {
+            const handleLogin = async (e) => {
                 e.preventDefault();
-                const fd = new FormData(e.target);
-                addToast("Provisioning isolated environment...", "info");
-                setTimeout(() => {
-                    addToast("Organization created successfully", "success");
-                    setIsOrgModalOpen(false);
-                    loadOrgs();
-                }, 1000);
+                const email = e.target.email.value;
+                const res = await fetch('/api/v1/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password: 'password' })
+                });
+                const data = await res.json();
+                if (data.token) {
+                    setToken(data.token);
+                    setUser(data.user);
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                }
             };
 
-            const handleFileUpload = async (type) => {
-                const input = type === 'splat' ? fileInputRef.current : planInputRef.current;
-                if (!input.files[0]) return;
-                setUploading(true);
-                addToast(`Uploading ${input.files[0].name}...`, "info");
-                setTimeout(() => {
-                    addToast("Upload accepted. Processing in background...", "success");
-                    setUploading(false);
-                    input.value = '';
-                }, 1500);
+            const logout = () => {
+                setToken(null); setUser(null);
+                localStorage.clear();
             };
 
-            const walls = [
-                { id: 'W-001', length: '4.2m', height: '3.0m', deviation: '+2mm', status: 'Verified' },
-                { id: 'W-002', length: '2.5m', height: '3.0m', deviation: '-5mm', status: 'Pending' },
-                { id: 'W-003', length: '5.8m', height: '3.0m', deviation: '+1mm', status: 'Verified' },
-                { id: 'W-004', length: '3.1m', height: '3.0m', deviation: '+12mm', status: 'Critical' },
-            ];
+            if (!token) {
+                return (
+                    <div className="h-screen w-full flex items-center justify-center bg-slate-950">
+                        <div className="glass p-12 rounded-2xl w-full max-w-md shadow-2xl border-slate-800">
+                            <div className="text-center mb-10">
+                                <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto flex items-center justify-center text-3xl font-black mb-4 shadow-lg shadow-blue-500/20">BM</div>
+                                <h1 className="text-2xl font-black tracking-tight">BuildingMesh Enterprise</h1>
+                                <p className="text-slate-500 text-sm mt-2">Sign in to Deep Control Platform</p>
+                            </div>
+                            <form onSubmit={handleLogin} className="space-y-6">
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-2 tracking-widest">Email Address</label>
+                                    <input name="email" type="email" required className="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition-colors" placeholder="engineer@company.com" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-2 tracking-widest">Password</label>
+                                    <input name="password" type="password" required className="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition-colors" placeholder="••••••••" />
+                                </div>
+                                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]">
+                                    Initialize Console
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <div className="flex h-screen overflow-hidden">
                     {/* Sidebar */}
-                    <aside className="w-72 bm-sidebar flex flex-col p-8">
-                        <div className="flex items-center gap-3 mb-12">
-                            <div className="w-10 h-10 border-2 border-cyan-500 rounded-sm flex items-center justify-center transform rotate-45">
-                                <i className="fas fa-layer-group text-cyan-500 transform -rotate-45 text-sm"></i>
+                    <aside className="w-64 border-r border-slate-800 bg-slate-950 p-6 flex flex-col justify-between">
+                        <div>
+                            <div className="flex items-center gap-3 mb-10">
+                                <div className="w-8 h-8 bg-tenant rounded flex items-center justify-center font-black text-sm">BM</div>
+                                <span className="font-bold tracking-tighter uppercase text-sm mono">BuildingMesh</span>
                             </div>
-                            <span className="font-bold text-lg tracking-tighter uppercase mono">Building<span className="text-cyan-500">Mesh</span></span>
-                        </div>
 
-                        <div className="mb-8">
-                            <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-4">Core Access</div>
                             <nav className="space-y-1">
-                                <button onClick={() => { setRole('engineer'); setView('dashboard'); }} className={`w-full flex items-center gap-4 px-4 py-3 rounded transition text-sm font-semibold text-left ${role === 'engineer' ? 'bg-cyan-500/5 text-cyan-400 border-l-2 border-cyan-500' : 'text-slate-400 hover:text-white'}`}>
-                                    <i className="fas fa-hard-hat w-5"></i> Engineering
+                                <button onClick={() => setView('engineering')} className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-bold transition-all ${view === 'engineering' ? 'bg-tenant/10 text-tenant' : 'text-slate-500 hover:bg-slate-900'}`}>
+                                    <i className="fas fa-cube"></i> Engineering Console
                                 </button>
-                                <button onClick={() => { setRole('superadmin'); setView('saas_dashboard'); }} className={`w-full flex items-center gap-4 px-4 py-3 rounded transition text-sm font-semibold text-left ${role === 'superadmin' ? 'bg-purple-500/5 text-purple-400 border-l-2 border-purple-500' : 'text-slate-400 hover:text-white'}`}>
-                                    <i className="fas fa-user-shield w-5"></i> Superadmin
-                                </button>
+                                {user.role === 'Admin' && (
+                                    <button onClick={() => setView('admin')} className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-bold transition-all ${view === 'admin' ? 'bg-purple-500/10 text-purple-400' : 'text-slate-500 hover:bg-slate-900'}`}>
+                                        <i className="fas fa-shield-alt"></i> SaaS Admin
+                                    </button>
+                                )}
                             </nav>
                         </div>
 
-                        {role === 'superadmin' && (
-                            <div className="mb-8">
-                                <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-4">SaaS Management</div>
-                                <nav className="space-y-1">
-                                    <button onClick={() => setView('saas_dashboard')} className={`w-full flex items-center gap-4 px-4 py-3 rounded transition text-sm font-semibold text-left ${view === 'saas_dashboard' ? 'text-purple-400' : 'text-slate-400 hover:text-white'}`}>
-                                        <i className="fas fa-chart-line w-5"></i> Dashboard
-                                    </button>
-                                    <button onClick={() => setView('orgs')} className={`w-full flex items-center gap-4 px-4 py-3 rounded transition text-sm font-semibold text-left ${view === 'orgs' ? 'text-purple-400' : 'text-slate-400 hover:text-white'}`}>
-                                        <i className="fas fa-building w-5"></i> Organizations
-                                    </button>
-                                    <button onClick={() => setView('iot')} className={`w-full flex items-center gap-4 px-4 py-3 rounded transition text-sm font-semibold text-left ${view === 'iot' ? 'text-purple-400' : 'text-slate-400 hover:text-white'}`}>
-                                        <i className="fas fa-microchip w-5"></i> IoT Monitoring
-                                    </button>
-                                </nav>
-                            </div>
-                        )}
-
-                        <div className="mt-auto pt-8 border-t border-slate-800/50">
-                            <div className="flex items-center gap-3 px-4">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold ${role === 'superadmin' ? 'bg-purple-500 text-black' : 'bg-slate-800 text-white'}`}>
-                                    {role === 'superadmin' ? 'SA' : 'JD'}
-                                </div>
-                                <div>
-                                    <div className="text-[10px] font-bold uppercase text-white">{role === 'superadmin' ? 'System Master' : 'Chief Engineer'}</div>
-                                    <div className="text-[9px] text-slate-500 mono">{role === 'superadmin' ? 'NODE_ROOT' : 'ID: 0x48FA2'}</div>
+                        <div className="pt-6 border-t border-slate-800">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold">{user.email[0].toUpperCase()}</div>
+                                <div className="overflow-hidden">
+                                    <p className="text-[10px] font-bold text-white truncate">{user.email}</p>
+                                    <p className="text-[9px] text-slate-500 uppercase font-bold">{user.role}</p>
                                 </div>
                             </div>
+                            <button onClick={logout} className="w-full py-2 bg-slate-900 hover:bg-red-500/10 hover:text-red-400 rounded text-[10px] font-bold uppercase transition-colors">Sign Out</button>
                         </div>
                     </aside>
 
                     {/* Main Content */}
-                    <main className="flex-1 overflow-auto bg-[#0a0b10]">
-                        {view === 'saas_dashboard' && (
-                            <div className="p-12 max-w-7xl mx-auto">
-                                <div className="mb-12">
-                                    <div className="text-purple-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Global SaaS Analytics</div>
-                                    <h1 className="text-4xl font-bold uppercase mono">Systems Overview</h1>
-                                </div>
-                                <div className="grid grid-cols-3 gap-8 mb-12">
-                                    <div className="bm-card p-8">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-4">Total Revenue (MRR)</div>
-                                        <div className="text-4xl font-black mono text-purple-400">$42,850</div>
-                                        <div className="text-[10px] text-green-500 mt-2 font-bold">+12.4% vs last month</div>
-                                    </div>
-                                    <div className="bm-card p-8">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-4">Active Projects</div>
-                                        <div className="text-4xl font-black mono text-cyan-400">1,284</div>
-                                        <div className="text-[10px] text-slate-500 mt-2 font-bold">across 14 organizations</div>
-                                    </div>
-                                    <div className="bm-card p-8">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-4">System Uptime</div>
-                                        <div className="text-4xl font-black mono text-green-400">99.98%</div>
-                                        <div className="text-[10px] text-slate-500 mt-2 font-bold">Health: STABLE</div>
-                                    </div>
-                                </div>
-                                <div className="bm-card p-8 bg-purple-500/5 border-purple-500/20">
-                                    <h3 className="text-xs font-black uppercase tracking-widest mb-6">Recent Tenant Activity</h3>
-                                    <div className="space-y-4">
-                                        {[
-                                            {action: 'New Org Created', target: 'Skyline Build', time: '2h ago'},
-                                            {action: 'Limit Upgrade', target: 'Alpha Dev', time: '5h ago'},
-                                            {action: 'API Key Rotated', target: 'Beta Construct', time: '1d ago'}
-                                        ].map((act, i) => (
-                                            <div key={i} className="flex justify-between items-center py-3 border-b border-white/5">
-                                                <span className="text-xs font-bold text-slate-300">{act.action}</span>
-                                                <span className="text-xs mono text-purple-400">{act.target}</span>
-                                                <span className="text-[10px] text-slate-600">{act.time}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {view === 'dashboard' && (
-                            <div className="p-12 max-w-7xl mx-auto">
-                                <div className="flex justify-between items-end mb-12">
+                    <main className="flex-1 flex flex-col bg-slate-950">
+                        {view === 'engineering' ? (
+                            <>
+                                <header className="h-[73px] border-b border-slate-800 flex justify-between items-center px-8 bg-slate-950/50">
                                     <div>
-                                        <div className="text-cyan-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Centralized Management</div>
-                                        <h1 className="text-4xl font-bold uppercase mono">Projects Registry</h1>
+                                        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Active Object</h2>
+                                        <p className="text-lg font-black tracking-tight">{org?.name || 'Loading...'} | Sector B2</p>
                                     </div>
-                                    <button onClick={() => setIsModalOpen(true)} className="bm-btn-primary">Initialize New Object</button>
-                                </div>
-                                <div className="bm-card">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr>
-                                                <th>ID</th>
-                                                <th>Project Name</th>
-                                                <th>Location</th>
-                                                <th>Deployment</th>
-                                                <th className="text-right">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {projects.map(p => (
-                                                <tr key={p.id} className="hover:bg-white/[0.02] transition">
-                                                    <td className="mono text-xs text-cyan-500/60 uppercase">{p.id.substring(0, 5)}</td>
-                                                    <td className="font-bold">{p.name}</td>
-                                                    <td className="text-slate-500">{p.address || 'UNDEFINED'}</td>
-                                                    <td className="text-slate-600 mono text-xs">{new Date(p.created_at).toISOString().split('T')[0]}</td>
-                                                    <td className="text-right">
-                                                        <button onClick={() => { setSelectedProject(p); setView('details'); }} className="text-xs font-bold uppercase text-cyan-500 border border-cyan-500/30 px-3 py-1 hover:bg-cyan-500 hover:text-black transition">Access Console</button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
+                                    <div className="flex gap-4 items-center">
+                                        <div className="flex items-center gap-4 bg-slate-900 px-4 py-2 rounded-full border border-slate-800">
+                                            <span className="text-[10px] font-black text-slate-500 uppercase">Time-Machine</span>
+                                            <input type="range" min="1" max="3" value={step} onChange={(e) => setStep(parseInt(e.target.value))} className="w-32 accent-tenant" />
+                                            <span className="text-xs font-mono text-tenant font-bold">STEP_0{step}</span>
+                                        </div>
+                                        <button onClick={() => { setIsScanning(true); setTimeout(() => setIsScanning(false), 3000); }} className="px-6 py-2 bg-tenant text-white text-[10px] font-black uppercase rounded-lg shadow-lg shadow-tenant/20 hover:opacity-90 active:scale-95 transition-all">Compare Reality</button>
+                                    </div>
+                                </header>
 
-                        {view === 'orgs' && (
-                            <div className="p-12 max-w-7xl mx-auto">
-                                <div className="flex justify-between items-end mb-12">
-                                    <div>
-                                        <div className="text-purple-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Tenant Registry</div>
-                                        <h1 className="text-4xl font-bold uppercase mono">Organizations</h1>
-                                    </div>
-                                    <div className="flex gap-4">
-                                        <div className="relative">
-                                            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"></i>
-                                            <input
-                                                value={orgSearch}
-                                                onChange={(e) => setOrgSearch(e.target.value)}
-                                                className="bm-input pl-12 py-2 text-xs w-64"
-                                                placeholder="Filter by name/domain..."
-                                            />
-                                        </div>
-                                        <button onClick={() => setIsOrgModalOpen(true)} className="px-6 py-2 border border-purple-500 text-purple-400 uppercase font-bold text-xs hover:bg-purple-500 hover:text-black transition">Create New Organization</button>
-                                    </div>
-                                </div>
-                                <div className="bm-card">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr>
-                                                <th>Org / Domain</th>
-                                                <th>Plan</th>
-                                                <th>Limits (P/U/H)</th>
-                                                <th>Status</th>
-                                                <th className="text-right">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {organizations.filter(o => o.name.toLowerCase().includes(orgSearch.toLowerCase()) || o.domain.toLowerCase().includes(orgSearch.toLowerCase())).map(org => (
-                                                <tr key={org.id} className="hover:bg-white/[0.02] transition">
-                                                    <td>
-                                                        <div className="font-bold">{org.name}</div>
-                                                        <div className="text-[10px] text-slate-500 mono">{org.domain}</div>
-                                                    </td>
-                                                    <td><span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${org.plan === 'Enterprise' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-800 text-slate-400'}`}>{org.plan}</span></td>
-                                                    <td className="mono text-xs text-slate-400">{org.max_projects} / {org.max_users} / {org.max_iot_hubs || 10}</td>
-                                                    <td><span className="text-xs text-green-400"><i className="fas fa-check-circle mr-1"></i> {org.status}</span></td>
-                                                    <td className="text-right space-x-2">
-                                                        <button onClick={() => addToast("Entering impersonation mode...", "info")} className="text-[10px] font-bold uppercase text-slate-400 hover:text-white">Impersonate</button>
-                                                        <button className="text-[10px] font-bold uppercase text-purple-400 border border-purple-400/20 px-3 py-1 hover:bg-purple-400 hover:text-black">Edit</button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
+                                <section className="flex-1 relative bg-black">
+                                    {isScanning && <div className="scan-line" />}
+                                    <ThreeDViewer step={step} primaryColor={org?.primary_color} />
 
-                        {view === 'iot' && (
-                            <div className="p-12 max-w-7xl mx-auto">
-                                <div className="mb-12">
-                                    <div className="text-purple-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Fleet Management</div>
-                                    <h1 className="text-4xl font-bold uppercase mono">IoT Infrastructure</h1>
-                                </div>
-                                <div className="grid grid-cols-4 gap-6 mb-12">
-                                    {[
-                                        {label: 'Real-time RPS', value: iotStats?.rps || '124.5', icon: 'fa-bolt', color: 'text-yellow-400'},
-                                        {label: 'Active Hubs', value: iotStats?.active_devices || '42', icon: 'fa-microchip', color: 'text-cyan-400'},
-                                        {label: 'Total Events', value: '1.54M', icon: 'fa-database', color: 'text-purple-400'},
-                                        {label: 'Error Rate', value: '0.02%', icon: 'fa-exclamation-circle', color: 'text-red-400'}
-                                    ].map(stat => (
-                                        <div key={stat.label} className="bm-card p-6">
-                                            <div className="flex justify-between items-start mb-4">
-                                                <div className="text-[10px] font-bold uppercase text-slate-500">{stat.label}</div>
-                                                <i className={`fas ${stat.icon} ${stat.color}`}></i>
+                                    <div className="absolute top-6 right-6 space-y-4 w-72 pointer-events-none">
+                                        <div className="glass p-5 rounded-2xl shadow-2xl">
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Integrity Score</p>
+                                            <div className="flex justify-between items-end mb-2">
+                                                <span className="text-xs font-bold">AI Verification</span>
+                                                <span className="text-xl font-black text-green-400 mono">98.2%</span>
                                             </div>
-                                            <div className="text-2xl font-bold mono">{stat.value}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="bm-card">
-                                    <div className="p-6 border-b border-slate-800 bg-white/[0.02]">
-                                        <h3 className="font-bold text-xs uppercase tracking-widest">System Anomaly Logs</h3>
-                                    </div>
-                                    <div className="p-4 space-y-2">
-                                        {sysLogs.map(log => (
-                                            <div key={log.id} className="p-4 bg-black/40 border-l-2 border-red-500 flex justify-between items-center mono text-xs">
-                                                <div className="flex gap-4">
-                                                    <span className="text-slate-600">[{log.timestamp}]</span>
-                                                    <span className="text-red-500 font-bold">{log.level}</span>
-                                                    <span className="text-slate-300">{log.message}</span>
-                                                </div>
-                                                <span className="text-slate-600 uppercase text-[10px]">{log.source}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {view === 'details' && (
-                            <div className="flex flex-col h-full">
-                                {/* Project Header & Sub-nav */}
-                                <div className="bg-[#13151c] border-b border-[#222632] px-12 pt-10">
-                                    <div className="flex justify-between items-start mb-8">
-                                        <div>
-                                            <button onClick={() => setView('dashboard')} className="mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-white flex items-center gap-2">
-                                                <i className="fas fa-arrow-left"></i> ← BACK
-                                            </button>
-                                            <h2 className="text-5xl font-black uppercase italic leading-none">{selectedProject.name}</h2>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => addToast("Generating PDF Report...", "info")} className="px-4 py-2 bg-slate-800 text-[10px] font-bold uppercase rounded hover:bg-slate-700 transition">Export Report</button>
-                                            <button onClick={() => addToast("Initializing AR Core Engine...", "info")} className="px-4 py-2 bg-cyan-500 text-black text-[10px] font-bold uppercase rounded hover:bg-cyan-400 transition">Go Live AR</button>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-8">
-                                        {['ingestion', 'alignment', 'analytics', 'sync'].map(tab => (
-                                            <button
-                                                key={tab}
-                                                onClick={() => setSubView(tab)}
-                                                className={`pb-4 px-2 text-[11px] font-bold uppercase tracking-wider transition ${subView === tab ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-500 hover:text-slate-300 border-b-2 border-transparent'}`}
-                                            >
-                                                {tab.replace('_', ' ')}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="flex-1 p-12 overflow-auto">
-                                    {subView === 'ingestion' && (
-                                        <div className="grid grid-cols-2 gap-10 max-w-6xl">
-                                            <div className="bm-card p-10 flex flex-col">
-                                                <h3 className="font-bold text-sm uppercase text-cyan-500 mb-8">Spatial Data Scan (.PLY)</h3>
-                                                <div className="flex-1 border border-dashed border-slate-800 p-12 flex flex-col items-center justify-center text-slate-600">
-                                                    <i className="fas fa-cube text-4xl mb-4 opacity-20"></i>
-                                                    <span className="uppercase text-[10px] font-bold tracking-widest">Drop Gaussian Splat or PLY here</span>
-                                                </div>
-                                                <input type="file" ref={fileInputRef} className="hidden" onChange={() => handleFileUpload('splat')} accept=".ply" />
-                                                <button onClick={() => fileInputRef.current.click()} disabled={uploading} className="bm-btn-primary w-full mt-8">
-                                                    {uploading ? 'Processing...' : 'Upload PLY'}
-                                                </button>
-                                            </div>
-                                            <div className="bm-card p-10 flex flex-col">
-                                                <h3 className="font-bold text-sm uppercase text-cyan-500 mb-8">Architectural Plan</h3>
-                                                <div className="flex-1 border border-dashed border-slate-800 p-12 flex flex-col items-center justify-center text-slate-600">
-                                                    <i className="fas fa-file-pdf text-4xl mb-4 opacity-20"></i>
-                                                    <span className="uppercase text-[10px] font-bold tracking-widest">Select PNG/PDF Drawing</span>
-                                                </div>
-                                                <input type="file" ref={planInputRef} className="hidden" onChange={() => handleFileUpload('plan')} accept=".png,.pdf" />
-                                                <button onClick={() => planInputRef.current.click()} disabled={uploading} className="bm-btn-primary w-full mt-8">
-                                                    {uploading ? 'Processing...' : 'Upload Plan'}
-                                                </button>
+                                            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                                <div className="bg-green-500 h-full transition-all duration-1000" style={{ width: '98.2%' }}></div>
                                             </div>
                                         </div>
-                                    )}
-                                    {/* Other subviews truncated for brevity but preserved in real implementation */}
+                                    </div>
+                                </section>
+                            </>
+                        ) : (
+                            <div className="p-12">
+                                <h1 className="text-4xl font-black uppercase italic mb-10">SaaS Administration</h1>
+                                <div className="grid grid-cols-3 gap-8">
+                                    <div className="glass p-8 rounded-2xl">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Active Tenants</p>
+                                        <p className="text-4xl font-black mono text-blue-400">14</p>
+                                    </div>
+                                    <div className="glass p-8 rounded-2xl">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Fleet Hubs</p>
+                                        <p className="text-4xl font-black mono text-cyan-400">42</p>
+                                    </div>
+                                    <div className="glass p-8 rounded-2xl">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">System Health</p>
+                                        <p className="text-4xl font-black mono text-green-500">NOMINAL</p>
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </main>
-
-                    {/* Modals */}
-                    {isOrgModalOpen && (
-                        <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50">
-                            <div className="bm-card w-full max-w-2xl p-12 border-purple-500/30">
-                                <h2 className="text-3xl font-black uppercase italic mb-8 text-purple-400">Provision Organization</h2>
-                                <form onSubmit={handleCreateOrg} className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div>
-                                            <label className="block text-[10px] font-bold uppercase text-slate-500 mb-2">Legal Name</label>
-                                            <input name="name" required className="bm-input focus:border-purple-500" placeholder="Alpha Dev Inc." />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-bold uppercase text-slate-500 mb-2">Domain Partition</label>
-                                            <input name="domain" required className="bm-input focus:border-purple-500" placeholder="alpha.buildingmesh.com" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-2">Hard Limits (Projects / Users / IoT Hubs)</label>
-                                        <div className="grid grid-cols-3 gap-4">
-                                            <input type="number" defaultValue="10" className="bm-input" placeholder="Proj" />
-                                            <input type="number" defaultValue="50" className="bm-input" placeholder="Users" />
-                                            <input type="number" defaultValue="5" className="bm-input" placeholder="Hubs" />
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-4 pt-6">
-                                        <button type="button" onClick={() => setIsOrgModalOpen(false)} className="flex-1 text-slate-500 uppercase font-bold text-xs">Cancel</button>
-                                        <button type="submit" className="flex-1 bg-purple-500 text-black py-3 uppercase font-black text-xs hover:bg-purple-400 transition">Initialize Isolated Workspace</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Toasts */}
-                    <div className="pointer-events-none fixed inset-0 z-[100] flex flex-col items-end justify-end p-8 gap-4">
-                        {toasts.map(toast => (
-                            <Toast key={toast.id} {...toast} onClose={() => removeToast(toast.id)} />
-                        ))}
-                    </div>
                 </div>
             );
         };

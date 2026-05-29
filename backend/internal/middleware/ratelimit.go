@@ -3,7 +3,6 @@ package middleware
 import (
 	"net/http"
 	"sync"
-
 	"golang.org/x/time/rate"
 )
 
@@ -24,26 +23,22 @@ func NewIPRateLimiter(r rate.Limit, b int) *IPRateLimiter {
 }
 
 func (i *IPRateLimiter) GetLimiter(ip string) *rate.Limiter {
-	i.mu.RLock()
+	i.mu.Lock()
+	defer i.mu.Unlock()
 	limiter, exists := i.ips[ip]
-	i.mu.RUnlock()
-
 	if !exists {
-		i.mu.Lock()
 		limiter = rate.NewLimiter(i.r, i.b)
 		i.ips[ip] = limiter
-		i.mu.Unlock()
 	}
-
 	return limiter
 }
 
-func RateLimit(limiter *IPRateLimiter) func(http.Handler) http.Handler {
+func RateLimit(limit *IPRateLimiter) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := r.RemoteAddr
-			if !limiter.GetLimiter(ip).Allow() {
-				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			limiter := limit.GetLimiter(r.RemoteAddr)
+			if !limiter.Allow() {
+				http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 				return
 			}
 			next.ServeHTTP(w, r)

@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"construction-ar-backend/internal/models"
+	"github.com/jung-kurt/gofpdf"
 	"construction-ar-backend/internal/repository"
 	"construction-ar-backend/internal/queue"
 	"construction-ar-backend/internal/cache"
@@ -178,6 +180,33 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(p)
 }
 
+// @Summary Get wall comparison (Design vs Reality)
+// @Tags Walls
+// @Produce json
+// @Param wallID path string true "Wall ID"
+// @Success 200 {object} object
+// @Router /walls/{wallID}/comparison [get]
+func (h *Handler) GetWallComparison(w http.ResponseWriter, r *http.Request) {
+	wallID := chi.URLParam(r, "wallID")
+	// Simulation of BIM comparison logic
+	comparison := struct {
+		DesignThickness float64 `json:"design_thickness"`
+		ActualThickness float64 `json:"actual_thickness"`
+		Deviation       float64 `json:"deviation"`
+		Status          string  `json:"status"`
+	}{
+		DesignThickness: 200.0,
+		ActualThickness: 205.4,
+		Deviation:       5.4,
+		Status:          "Warning",
+	}
+	if wallID == "W-004" {
+		comparison.Deviation = 12.1
+		comparison.Status = "Critical"
+	}
+	json.NewEncoder(w).Encode(comparison)
+}
+
 // @Summary Get wall details
 // @Description Get details of a specific wall including layers
 // @Tags Walls
@@ -331,6 +360,43 @@ func (h *Handler) PatchIssueStatus(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HealthLive(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
+}
+
+func (h *Handler) ExportProjectPDF(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "projectID")
+
+	// Create PDF
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+	pdf.SetFont("Arial", "B", 16)
+	pdf.Cell(40, 10, fmt.Sprintf("BuildingMesh Inspection Report: %s", projectID))
+	pdf.Ln(12)
+
+	pdf.SetFont("Arial", "", 12)
+	pdf.Cell(40, 10, "Summary of construction deviations and wall integrity.")
+	pdf.Ln(10)
+
+	pdf.SetFillColor(240, 240, 240)
+	pdf.CellFormat(190, 8, "Wall ID | Deviation | Status", "1", 0, "L", true, 0, "")
+	pdf.Ln(8)
+
+	// Mock data for report
+	walls := []struct{ID, Dev, Stat string}{
+		{"W-001", "+2mm", "Verified"},
+		{"W-004", "+12mm", "Critical"},
+	}
+
+	for _, wall := range walls {
+		pdf.CellFormat(190, 8, fmt.Sprintf("%s | %s | %s", wall.ID, wall.Dev, wall.Stat), "1", 0, "L", false, 0, "")
+		pdf.Ln(8)
+	}
+
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", "attachment; filename=report.pdf")
+	err := pdf.Output(w)
+	if err != nil {
+		http.Error(w, "PDF generation error", http.StatusInternalServerError)
+	}
 }
 
 func (h *Handler) HealthReady(w http.ResponseWriter, r *http.Request) {

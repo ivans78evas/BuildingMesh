@@ -1,9 +1,16 @@
 package repository
 
 import (
-	"database/sql"
 	"construction-ar-backend/internal/models"
+	"database/sql"
+	"errors"
+	"time"
+
 	_ "modernc.org/sqlite"
+)
+
+var (
+	ErrApprovedCommitReadOnly = errors.New("cannot modify an approved inspection commit")
 )
 
 type Repository struct {
@@ -11,6 +18,8 @@ type Repository struct {
 }
 
 func NewRepository(dbPath string) (*Repository, error) {
+	// Use sqlite3 as driver name for compatibility with migrate if needed,
+	// but modernc registers itself as "sqlite".
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
@@ -27,38 +36,17 @@ func (r *Repository) DB() *sql.DB {
 	return r.db
 }
 
-func (r *Repository) GetProjects() ([]models.Project, error) {
-	rows, err := r.db.Query("SELECT id, organization_id, name, address, created_at FROM projects")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var projects []models.Project
-	for rows.Next() {
-		var p models.Project
-		if err := rows.Scan(&p.ID, &p.OrganizationID, &p.Name, &p.Address, &p.CreatedAt); err != nil {
-			return nil, err
-		}
-		projects = append(projects, p)
-	}
-	return projects, nil
-}
-
-func (r *Repository) CreateProject(p models.Project) error {
-	_, err := r.db.Exec("INSERT INTO projects (id, organization_id, name, address, created_at) VALUES (?, ?, ?, ?, ?)",
-		p.ID, p.OrganizationID, p.Name, p.Address, p.CreatedAt)
-	return err
-}
+// --- Organization Methods ---
 
 func (r *Repository) CreateOrganization(o models.Organization) error {
-	_, err := r.db.Exec("INSERT INTO organizations (id, name, plan, created_at) VALUES (?, ?, ?, ?)",
-		o.ID, o.Name, o.Plan, o.CreatedAt)
+	_, err := r.db.Exec(`INSERT INTO organizations (id, name, domain, plan, status, max_projects, max_users, max_iot_hubs, primary_color, logo_url, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		o.ID, o.Name, o.Domain, o.Plan, o.Status, o.MaxProjects, o.MaxUsers, o.MaxIoTHubs, o.PrimaryColor, o.LogoURL, o.CreatedAt)
 	return err
 }
 
 func (r *Repository) GetOrganizations() ([]models.Organization, error) {
-	rows, err := r.db.Query("SELECT id, name, plan, created_at FROM organizations")
+	rows, err := r.db.Query("SELECT id, name, domain, plan, status, max_projects, max_users, max_iot_hubs, primary_color, logo_url, created_at FROM organizations")
 	if err != nil {
 		return nil, err
 	}
@@ -67,13 +55,15 @@ func (r *Repository) GetOrganizations() ([]models.Organization, error) {
 	var orgs []models.Organization
 	for rows.Next() {
 		var o models.Organization
-		if err := rows.Scan(&o.ID, &o.Name, &o.Plan, &o.CreatedAt); err != nil {
+		if err := rows.Scan(&o.ID, &o.Name, &o.Domain, &o.Plan, &o.Status, &o.MaxProjects, &o.MaxUsers, &o.MaxIoTHubs, &o.PrimaryColor, &o.LogoURL, &o.CreatedAt); err != nil {
 			return nil, err
 		}
 		orgs = append(orgs, o)
 	}
 	return orgs, nil
 }
+
+// --- User Methods ---
 
 func (r *Repository) CreateUser(u models.User) error {
 	_, err := r.db.Exec("INSERT INTO users (id, organization_id, email, full_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -99,91 +89,143 @@ func (r *Repository) GetUsersByOrg(orgID string) ([]models.User, error) {
 	return users, nil
 }
 
-func (r *Repository) CreateWall(w models.Wall) error {
-	_, err := r.db.Exec("INSERT INTO walls (id, project_id, name, type, status, thickness, pos_x, pos_y, pos_z, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		w.ID, w.ProjectID, w.Name, w.Type, w.Status, w.Thickness, w.PositionX, w.PositionY, w.PositionZ, w.CreatedAt)
+// --- Project Methods ---
+
+func (r *Repository) CreateProject(p models.Project) error {
+	_, err := r.db.Exec("INSERT INTO projects (id, organization_id, name, address, created_at) VALUES (?, ?, ?, ?, ?)",
+		p.ID, p.OrganizationID, p.Name, p.Address, p.CreatedAt)
 	return err
 }
 
-func (r *Repository) CreateLayer(l models.Layer) error {
-	_, err := r.db.Exec("INSERT INTO layers (id, wall_id, name, material, thickness, \"order\") VALUES (?, ?, ?, ?, ?, ?)",
-		l.ID, l.WallID, l.Name, l.Material, l.Thickness, l.Order)
-	return err
-}
-
-func (r *Repository) GetWallDetails(wallID string) (*models.Wall, []models.Layer, error) {
-	var w models.Wall
-	err := r.db.QueryRow("SELECT id, project_id, name, type, status, thickness, pos_x, pos_y, pos_z, created_at FROM walls WHERE id = ?", wallID).
-		Scan(&w.ID, &w.ProjectID, &w.Name, &w.Type, &w.Status, &w.Thickness, &w.PositionX, &w.PositionY, &w.PositionZ, &w.CreatedAt)
+func (r *Repository) GetProjects() ([]models.Project, error) {
+	rows, err := r.db.Query("SELECT id, organization_id, name, address, created_at FROM projects")
 	if err != nil {
-		return nil, nil, err
-	}
-
-	rows, err := r.db.Query("SELECT id, wall_id, name, material, thickness, \"order\" FROM layers WHERE wall_id = ? ORDER BY \"order\"", wallID)
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer rows.Close()
 
-	var layers []models.Layer
+	var projects []models.Project
 	for rows.Next() {
-		var l models.Layer
-		if err := rows.Scan(&l.ID, &l.WallID, &l.Name, &l.Material, &l.Thickness, &l.Order); err != nil {
-			return nil, nil, err
+		var p models.Project
+		if err := rows.Scan(&p.ID, &p.OrganizationID, &p.Name, &p.Address, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		projects = append(projects, p)
+	}
+	return projects, nil
+}
+
+// --- BIM & Layer Methods ---
+
+func (r *Repository) CreateBIMElement(e models.BIMElement) error {
+	_, err := r.db.Exec(`INSERT INTO bim_elements (id, project_id, external_guid, name, element_type, level, position_json, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.ID, e.ProjectID, e.ExternalGUID, e.Name, e.ElementType, e.Level, e.PositionJSON, e.CreatedAt)
+	return err
+}
+
+func (r *Repository) GetBIMElements(projectID string) ([]models.BIMElement, error) {
+	rows, err := r.db.Query("SELECT id, project_id, external_guid, name, element_type, level, position_json, created_at FROM bim_elements WHERE project_id = ?", projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var elements []models.BIMElement
+	for rows.Next() {
+		var e models.BIMElement
+		if err := rows.Scan(&e.ID, &e.ProjectID, &e.ExternalGUID, &e.Name, &e.ElementType, &e.Level, &e.PositionJSON, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		elements = append(elements, e)
+	}
+	return elements, nil
+}
+
+func (r *Repository) CreateTemporalLayer(l models.TemporalLayer) error {
+	_, err := r.db.Exec(`INSERT INTO temporal_layers (id, bim_element_id, name, scan_date, type, s3_path, metadata_json, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		l.ID, l.BIMElementID, l.Name, l.ScanDate, l.Type, l.S3Path, l.MetadataJSON, l.CreatedAt)
+	return err
+}
+
+func (r *Repository) GetTemporalLayers(elementID string) ([]models.TemporalLayer, error) {
+	rows, err := r.db.Query("SELECT id, bim_element_id, name, scan_date, type, s3_path, metadata_json, created_at FROM temporal_layers WHERE bim_element_id = ? ORDER BY scan_date ASC", elementID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var layers []models.TemporalLayer
+	for rows.Next() {
+		var l models.TemporalLayer
+		if err := rows.Scan(&l.ID, &l.BIMElementID, &l.Name, &l.ScanDate, &l.Type, &l.S3Path, &l.MetadataJSON, &l.CreatedAt); err != nil {
+			return nil, err
 		}
 		layers = append(layers, l)
 	}
-
-	return &w, layers, nil
+	return layers, nil
 }
 
-func (r *Repository) CreateSplat(s models.Splat) error {
-	_, err := r.db.Exec("INSERT INTO splats (id, project_id, name, file_path, created_at) VALUES (?, ?, ?, ?, ?)",
-		s.ID, s.ProjectID, s.Name, s.FilePath, s.CreatedAt)
+// --- Inspection Commit Methods (with Read-Only Logic) ---
+
+func (r *Repository) CreateInspectionCommit(c models.InspectionCommit) error {
+	_, err := r.db.Exec(`INSERT INTO inspection_commits (id, bim_element_id, temporal_layer_id, health_score, status, comments, inspector_id, approved_at, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, c.BIMElementID, c.TemporalLayerID, c.HealthScore, c.Status, c.Comments, c.InspectorID, c.ApprovedAt, c.CreatedAt)
 	return err
 }
 
-func (r *Repository) GetSplats(projectID string) ([]models.Splat, error) {
-	rows, err := r.db.Query("SELECT id, project_id, name, file_path, created_at FROM splats WHERE project_id = ?", projectID)
+func (r *Repository) UpdateInspectionCommit(c models.InspectionCommit) error {
+	// Check if already approved
+	var approvedAt *time.Time
+	err := r.db.QueryRow("SELECT approved_at FROM inspection_commits WHERE id = ?", c.ID).Scan(&approvedAt)
+	if err != nil {
+		return err
+	}
+
+	if approvedAt != nil {
+		return ErrApprovedCommitReadOnly
+	}
+
+	_, err = r.db.Exec(`UPDATE inspection_commits SET health_score = ?, status = ?, comments = ?, inspector_id = ?, approved_at = ? WHERE id = ?`,
+		c.HealthScore, c.Status, c.Comments, c.InspectorID, c.ApprovedAt, c.ID)
+	return err
+}
+
+func (r *Repository) GetInspectionCommits(elementID string) ([]models.InspectionCommit, error) {
+	rows, err := r.db.Query("SELECT id, bim_element_id, temporal_layer_id, health_score, status, comments, inspector_id, approved_at, created_at FROM inspection_commits WHERE bim_element_id = ?", elementID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var splats []models.Splat
+	var commits []models.InspectionCommit
 	for rows.Next() {
-		var s models.Splat
-		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Name, &s.FilePath, &s.CreatedAt); err != nil {
+		var c models.InspectionCommit
+		if err := rows.Scan(&c.ID, &c.BIMElementID, &c.TemporalLayerID, &c.HealthScore, &c.Status, &c.Comments, &c.InspectorID, &c.ApprovedAt, &c.CreatedAt); err != nil {
 			return nil, err
 		}
-		splats = append(splats, s)
+		commits = append(commits, c)
 	}
-	return splats, nil
+	return commits, nil
 }
 
-func (r *Repository) CreateFloorPlan(fp models.FloorPlan) error {
-	_, err := r.db.Exec("INSERT INTO floor_plans (id, project_id, name, image_path, scale, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-		fp.ID, fp.ProjectID, fp.Name, fp.ImagePath, fp.Scale, fp.CreatedAt)
+// --- Usage Log Methods ---
+
+func (r *Repository) CreateUsageLog(l models.UsageLog) error {
+	_, err := r.db.Exec("INSERT INTO usage_logs (id, organization_id, project_id, captured_sq_m, scan_type, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+		l.ID, l.OrganizationID, l.ProjectID, l.CapturedSqM, l.ScanType, l.CreatedAt)
 	return err
 }
 
-func (r *Repository) GetFloorPlans(projectID string) ([]models.FloorPlan, error) {
-	rows, err := r.db.Query("SELECT id, project_id, name, image_path, scale, created_at FROM floor_plans WHERE project_id = ?", projectID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var plans []models.FloorPlan
-	for rows.Next() {
-		var fp models.FloorPlan
-		if err := rows.Scan(&fp.ID, &fp.ProjectID, &fp.Name, &fp.ImagePath, &fp.Scale, &fp.CreatedAt); err != nil {
-			return nil, err
-		}
-		plans = append(plans, fp)
-	}
-	return plans, nil
+func (r *Repository) GetTotalUsage(orgID string) (float64, error) {
+	var total float64
+	err := r.db.QueryRow("SELECT COALESCE(SUM(captured_sq_m), 0) FROM usage_logs WHERE organization_id = ?", orgID).Scan(&total)
+	return total, err
 }
+
+// --- Legacy Support & Infrastructure ---
 
 func (r *Repository) CreateIssue(i models.Issue) error {
 	_, err := r.db.Exec("INSERT INTO issues (id, project_id, x, y, z, status, priority, description, creator, assignee, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -212,6 +254,30 @@ func (r *Repository) GetIssues(projectID string) ([]models.Issue, error) {
 func (r *Repository) UpdateIssueStatus(id string, status string) error {
 	_, err := r.db.Exec("UPDATE issues SET status = ? WHERE id = ?", status, id)
 	return err
+}
+
+func (r *Repository) CreateSplat(s models.Splat) error {
+	_, err := r.db.Exec("INSERT INTO splats (id, project_id, name, file_path, created_at) VALUES (?, ?, ?, ?, ?)",
+		s.ID, s.ProjectID, s.Name, s.FilePath, s.CreatedAt)
+	return err
+}
+
+func (r *Repository) GetSplats(projectID string) ([]models.Splat, error) {
+	rows, err := r.db.Query("SELECT id, project_id, name, file_path, created_at FROM splats WHERE project_id = ?", projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var splats []models.Splat
+	for rows.Next() {
+		var s models.Splat
+		if err := rows.Scan(&s.ID, &s.ProjectID, &s.Name, &s.FilePath, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		splats = append(splats, s)
+	}
+	return splats, nil
 }
 
 func (r *Repository) Ping() error {

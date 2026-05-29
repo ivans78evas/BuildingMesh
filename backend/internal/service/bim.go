@@ -4,6 +4,8 @@ import (
 	"construction-ar-backend/internal/models"
 	"construction-ar-backend/internal/repository"
 	"github.com/google/uuid"
+	"time"
+	"errors"
 )
 
 type BIMService struct {
@@ -14,39 +16,23 @@ func NewBIMService(repo *repository.Repository) *BIMService {
 	return &BIMService{repo: repo}
 }
 
-// ProcessIFC имитирует парсинг IFC файла и сохранение данных в БД.
-// В реальном приложении здесь был бы вызов ifcopenshell или аналогичной библиотеки.
 func (s *BIMService) ProcessIFC(projectID string, filePath string) error {
-	// 1. Извлечение геометрии стен
-	// 2. Извлечение слоев
-	// 3. Извлечение инсталляций
+	if projectID == "" || filePath == "" {
+		return errors.New("missing project ID or file path")
+	}
 
-	// Пример добавления тестовых данных после "парсинга"
-	wallID := uuid.New().String()
-	err := s.repo.CreateWall(models.Wall{
-		ID:        wallID,
-		ProjectID: projectID,
-		Name:      "Wall-001",
-		Thickness: 0.3,
-		PositionX: 0,
-		PositionY: 0,
-		PositionZ: 0,
+	// Mock Extraction Logic
+	elementID := uuid.New().String()
+	err := s.repo.CreateBIMElement(models.BIMElement{
+		ID:           elementID,
+		ProjectID:    projectID,
+		ExternalGUID: "IFC-" + uuid.New().String()[:8],
+		Name:         "Structural Wall B2",
+		ElementType:  "Wall",
+		Level:        "Floor 2",
+		PositionJSON: `{"x": 0, "y": 1.5, "z": 0}`,
+		CreatedAt:    time.Now(),
 	})
-	if err != nil {
-		return err
-	}
 
-	layers := []models.Layer{
-		{ID: uuid.New().String(), WallID: wallID, Name: "Plaster", Material: "Gypsum", Thickness: 0.02, Order: 1},
-		{ID: uuid.New().String(), WallID: wallID, Name: "Brick", Material: "Red Brick", Thickness: 0.25, Order: 2},
-		{ID: uuid.New().String(), WallID: wallID, Name: "Finish", Material: "Paint", Thickness: 0.01, Order: 3},
-	}
-
-	for _, l := range layers {
-		if err := s.repo.CreateLayer(l); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return err
 }
