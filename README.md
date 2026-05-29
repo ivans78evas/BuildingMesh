@@ -1,42 +1,36 @@
-# Интерактивная система AR-мониторинга стройки (SaaS)
+# BuildingMesh | Enterprise AR-Monitoring System
 
-Комплексное решение для визуализации скрытых коммуникаций и слоев стен.
+BuildingMesh is a high-fidelity SaaS platform for construction sites, designed to visualize internal wall structures, hidden installations, and historical construction phases.
 
-## Технологии
-- **AR & 3D**: Google Geospatial API, 3D Gaussian Splatting (PlayCanvas), ARCore.
-- **Sensing**: RuView (WiFi Sensing AI) через ESP32-S3 (OTG/Bluetooth).
-- **Backend**: Go + SQLite (оптимизировано под Intel N100).
-- **Frontend**: Flutter (вычисления на GPU мобильного устройства).
-- **Intelligence**: Google Cloud Vision & Gemini Flash для анализа чертежей.
+## 🏗 Hybrid Enterprise Architecture
+BuildingMesh uses a unique two-layer architecture to balance deep tech performance with corporate management needs:
 
-## Роли доступа
-- **Владелец**: Полный аудит проекта.
-- **Управляющий**: Настройка объекта и прав.
-- **Архитектор**: Работа с BIM и планами.
-- **Прораб**: Съемка 360-панорам и Splats.
-- **Инженер/Рабочий**: AR X-Ray ("прозрачные стены").
+1. **Proprietary Sensing Engine (Go 1.23)**: Handles LiDAR processing, 3D Gaussian Splatting, and RuView Wi-Fi CSI sensing. This is our core IP.
+2. **Twenty CRM Engine (Headless Metadata)**: Provides Enterprise-grade multi-tenancy, workflow automation, and metadata management via an isolated AGPL-3.0 compliant proxy.
 
-## Установка и запуск
-1. **Быстрый деплой на сервер (Debian 13)**:
+## 🚀 Key Features
+- **AR X-Ray**: See "through" finished walls using historical LiDAR/CSI chronological layers.
+- **Layer Time-Machine**: Slide through time to see the state of any wall during electrical, insulation, or finishing stages.
+- **Git-like Inspection**: Construct digital "commits" for hidden works. Approved states become Read-Only to ensure a legal audit trail.
+- **RuView Sensing**: Integrated support for ESP32-S3 sensors for non-destructive physical verification of installations.
+
+## 🛠 Tech Stack
+- **Backend**: Go (Proprietary Brain), Twenty CRM (Enterprise Framework), Redis, RabbitMQ.
+- **Storage**: SQLite (Local Metadata), PostgreSQL (CRM), S3 (Point Clouds/CSI logs).
+- **Frontend**: Flutter (Mobile AR/GPU Compute), React (Web Engineering Console).
+- **AI**: Google Cloud Vision & Gemini for BIM/Drawing alignment.
+
+## 📦 Deployment
+1. **Docker Compose**: Start the entire cluster including Twenty and our backend:
    ```bash
-   chmod +x deploy_server.sh
-   ./deploy_server.sh
+   docker-compose up -d
    ```
-2. **Backend (Вручную)**:
-   \`\`\`bash
+2. **Backend**:
+   ```bash
    cd backend
    go run cmd/server/main.go
-   \`\`\`
-3. **Перезапуск сервера**:
-   \`\`\`bash
-   chmod +x restart.sh
-   ./restart.sh
-   \`\`\`
-2. **Frontend**:
-   \`\`\`bash
-   cd frontend/construction_ar_app
-   flutter run
-   \`\`\`
+   ```
+3. **Engineering Console**: Access the web dashboard at `http://localhost:8080`.
 
-## Подключение ESP32-S3 (RuView)
-Подключите устройство через USB OTG. В приложении выберите порт в меню "Сенсоры". Данные WiFi Sensing будут автоматически накладываться в AR.
+---
+*Note: This system is architected for maximum IP protection, isolating proprietary sensing algorithms from open-source dependencies.*

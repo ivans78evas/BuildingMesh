@@ -1,28 +1,35 @@
-# UX Концепция: AR Construction Intelligence
+# BuildingMesh | Enterprise Hybrid Architecture Concept
 
-## 1. Проблема
-На стройке информация разрознена: чертежи в бумаге/PDF, BIM в тяжелых вьюерах, реальное состояние стен скрыто штукатуркой.
+BuildingMesh V1 is designed as a high-performance construction monitoring platform that leverages a hybrid backend architecture for scalability, data sovereignty, and rapid time-to-market.
 
-## 2. Решение
-Интерактивное "рентгеновское" зрение, которое объединяет 4 источника данных:
-- **Проект (BIM)**: То, как должно быть.
-- **История (Splats/360)**: То, как было во время монтажа.
-- **Активный мониторинг (RuView)**: То, что за стеной сейчас (люди, движение).
-- **Глобальный контекст (Google Maps)**: Где мы находимся.
+## 1. The Hybrid Core
+The system splits responsibility between two distinct layers:
 
-## 3. Ключевые сценарии (User Stories)
-### Сценарий "Безопасное сверление"
-1. Рабочий открывает AR-режим.
-2. Система подсвечивает синим трубы (BIM).
-3. RuView датчик (ESP32) подает сигнал: за стеной человек (красный фантом).
-4. Рабочий останавливает работу до ухода человека из зоны риска.
+### A. Proprietary Construction Engine (The "Brain")
+- **Tech Stack:** Go 1.23, SQLite (Metadata), Redis (Cache), RabbitMQ (Task Queue).
+- **Responsibility:**
+  - Processing heavy LiDAR and 3D Gaussian Splatting data.
+  - Analyzing Wi-Fi CSI signals from RuView sensors.
+  - Managing chronological "Time-Machine" snapshots of wall structures.
+  - Generating legal-grade audit reports (PDF).
+- **Isolation:** This layer owns all Intellectual Property (IP) related to construction physics and sensor fusion.
 
-### Сценарий "Приемка скрытых работ"
-1. Менеджер накладывает 3DGS скан открытых коммуникаций на текущую оштукатуренную стену.
-2. UX-ползунок позволяет "прозрачно" увидеть, где именно проходят провода под отделкой.
+### B. Twenty CRM Engine (The "Enterprise Metadata Head")
+- **Tech Stack:** NestJS, PostgreSQL, GraphQL.
+- **Responsibility:**
+  - Multi-tenant Organization management.
+  - Role-Based Access Control (RBAC) definitions.
+  - Project metadata (addresses, participants, schedules).
+  - Workflow automation (email alerts, status transitions).
+- **Integration:** Connected via a secure Proxy Client using GraphQL.
 
-## 4. Принципы дизайна
-- **Dark Mode**: Снижение нагрузки на глаза на ярком солнце и экономия заряда.
-- **Layer-First**: Быстрый доступ к фильтрации данных через BottomSheet.
-- **Local-First**: Мгновенный отклик интерфейса даже без интернета.
-- **Sensor Fusion Status**: Постоянная индикация точности привязки (GPS/Gyro/Magnet).
+## 2. User Journey: "The Git-like Commit"
+1. **Field Scan:** An engineer scans a wall using the iPhone LiDAR + RuView sensor.
+2. **Local Processing:** The phone processes the point cloud and sends it to our proprietary Go backend.
+3. **Commit Creation:** The backend creates an `InspectionCommit`.
+4. **Metadata Sync:** The Go backend tells Twenty CRM: *"Project B2 has a new verified layer."*
+5. **Office Review:** Management sees the update in the Twenty web dashboard, while the engineer sees the "X-Ray" view in the AR app.
+
+## 3. Data Sovereignty & Licensing
+- **Licensing:** Twenty is licensed under AGPL-3.0. By using the **Proxy Pattern**, we keep our proprietary algorithms isolated from Twenty's source code, protecting our IP for future acquisition.
+- **Flexibility:** The architecture allows swapping Twenty for Salesforce, SAP, or a custom ERP without touching the 3D/Sensing logic.

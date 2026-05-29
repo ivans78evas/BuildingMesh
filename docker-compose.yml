@@ -11,10 +11,12 @@ services:
       - DB_PATH=construction.db
       - REDIS_URL=redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - TWENTY_API_URL=http://twenty-server:3000/graphql
       - ALLOWED_ORIGINS=*
     depends_on:
       - redis
       - rabbitmq
+      - twenty-server
 
   redis:
     image: redis:alpine
@@ -26,3 +28,36 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+
+  # Twenty CRM - Open Source Enterprise Engine
+  twenty-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: twenty
+      POSTGRES_PASSWORD: twenty_password
+      POSTGRES_DB: twenty
+    volumes:
+      - twenty-db-data:/var/lib/postgresql/data
+
+  twenty-server:
+    image: twentycrm/twenty:latest
+    environment:
+      - PG_DATABASE_URL=postgres://twenty:twenty_password@twenty-db:5432/twenty
+      - REDIS_URL=redis://redis:6379
+      - SERVER_PORT=3000
+    depends_on:
+      - twenty-db
+      - redis
+
+  twenty-worker:
+    image: twentycrm/twenty:latest
+    command: ["npm", "run", "worker:prod"]
+    environment:
+      - PG_DATABASE_URL=postgres://twenty:twenty_password@twenty-db:5432/twenty
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - twenty-db
+      - redis
+
+volumes:
+  twenty-db-data:

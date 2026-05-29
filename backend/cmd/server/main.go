@@ -10,6 +10,8 @@ import (
 	"construction-ar-backend/internal/middleware"
 	"construction-ar-backend/internal/queue"
 	"construction-ar-backend/internal/repository"
+	"construction-ar-backend/internal/service"
+	"construction-ar-backend/internal/twenty"
 	"fmt"
 	"net/http"
 	"os"
@@ -36,35 +38,25 @@ func main() {
 
 	logger.Log.Info("Starting BuildingMesh Backend", zap.String("env", cfg.Environment))
 
-	// Database & Migrations
+	// Database
 	repo, err := repository.NewRepository(cfg.DBPath)
 	if err != nil {
 		logger.Log.Fatal("Failed to connect to DB", zap.Error(err))
 	}
 	defer repo.Close()
-
 	runMigrations(repo, "migrations")
 
-	// Cache (Redis)
-	redisCache, err := cache.NewCache(cfg.RedisURL)
-	if err != nil {
-		logger.Log.Warn("Failed to connect to Redis", zap.Error(err))
-	} else {
-		defer redisCache.Close()
-		logger.Log.Info("Connected to Redis")
-	}
+	// Twenty CRM Client (Headless Metadata Engine)
+	twentyClient := twenty.NewClient(os.Getenv("TWENTY_API_URL"), os.Getenv("TWENTY_API_KEY"))
 
-	// Queue (RabbitMQ)
-	rabbitQueue, err := queue.NewQueue(cfg.RabbitMQURL)
-	if err != nil {
-		logger.Log.Warn("Failed to connect to RabbitMQ", zap.Error(err))
-	} else {
-		defer rabbitQueue.Close()
-		logger.Log.Info("Connected to RabbitMQ")
-		rabbitQueue.StartWorker(context.Background())
-	}
+	// Services
+	projectSvc := service.NewProjectService(repo, twentyClient)
 
-	h := handlers.NewHandler(repo, rabbitQueue, redisCache)
+	// Infrastructure
+	redisCache, _ := cache.NewCache(cfg.RedisURL)
+	rabbitQueue, _ := queue.NewQueue(cfg.RabbitMQURL)
+
+	h := handlers.NewHandler(repo, rabbitQueue, redisCache, projectSvc)
 	r := chi.NewRouter()
 
 	// Middlewares
@@ -75,11 +67,10 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: cfg.AllowedOrigins,
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
 	}))
 
-	// Rate limiting for uploads
-	limiter := middleware.NewIPRateLimiter(1, 5) // 1 request per second, burst 5
+	limiter := middleware.NewIPRateLimiter(1, 5)
 
 	// API Routes
 	r.Route("/api/v1", func(r chi.Router) {
@@ -87,83 +78,47 @@ func main() {
 		r.Get("/health/live", h.HealthLive)
 		r.Get("/health/ready", h.HealthReady)
 
-		// Protected Routes
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth)
-
 			r.Get("/me", h.Me)
 
-			// Admin/SaaS Routes (Superadmin only)
+			// Admin/SaaS
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireRole("Superadmin"))
 				r.Get("/organizations", h.GetOrganizations)
 				r.Post("/organizations", h.CreateOrganization)
 				r.Get("/saas/iot/stats", h.GetIoTStats)
-				r.Get("/saas/logs", h.GetSystemLogs)
 			})
 
-			// Project & Inspection Routes (Admin, Engineer)
+			// Business Logic
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireRole("Superadmin", "Admin", "Engineer"))
-
 				r.Get("/projects", h.GetProjects)
 				r.Post("/projects", h.CreateProject)
-				r.Get("/organizations/{orgID}/users", h.GetUsers)
-				r.Post("/users", h.CreateUser)
-				r.Get("/organizations/{orgID}/usage", h.GetOrgUsage)
-
-				// BIM & Time-Machine
 				r.Get("/projects/{projectID}/elements", h.GetBIMElements)
-				r.Get("/elements/{elementID}/layers", h.GetTemporalLayers)
-				r.Post("/elements/{elementID}/layers", h.CreateTemporalLayer)
-
-				// Inspection Commits (Git-like)
-				r.Get("/elements/{elementID}/commits", h.GetInspectionCommits)
 				r.Post("/commits", h.CreateInspectionCommit)
-				r.Patch("/commits/{id}", h.UpdateInspectionCommit)
-
-				r.Get("/walls/{wallID}/comparison", h.GetWallComparison)
-
-				r.Group(func(r chi.Router) {
-					r.Use(middleware.RateLimit(limiter))
-					r.Post("/projects/{projectID}/splats", h.UploadSplat)
-				})
-
-				r.Get("/projects/{projectID}/issues", h.GetIssues)
-				r.Post("/projects/{projectID}/issues", h.CreateIssue)
-				r.Patch("/issues/{id}/status", h.PatchIssueStatus)
 				r.Get("/projects/{projectID}/export", h.ExportProjectPDF)
 			})
 		})
 	})
 
-	// Swagger
-	r.Get("/api/docs/*", httpSwagger.Handler(httpSwagger.URL("/api/docs/doc.json")))
-
-	// Static & SPA
-	workDir, _ := os.Getwd()
-	webDir := filepath.Join(workDir, "cmd/server/web")
+	// Static SPA
+	webDir := filepath.Join(".", "backend/cmd/server/web")
 	if _, err := os.Stat(webDir); os.IsNotExist(err) {
-		webDir = filepath.Join(workDir, "backend/cmd/server/web")
+		webDir = filepath.Join(".", "cmd/server/web")
 	}
-	filesDir := http.Dir(webDir)
 
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, ".") {
-			http.FileServer(filesDir).ServeHTTP(w, r)
+			http.FileServer(http.Dir(webDir)).ServeHTTP(w, r)
 			return
 		}
 		http.ServeFile(w, r, filepath.Join(webDir, "index.html"))
 	})
 
-	srv := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: r,
-	}
-
-	// Graceful Shutdown
+	srv := &http.Server{Addr: ":8080", Handler: r}
 	go func() {
-		logger.Log.Info("Server listening", zap.String("port", cfg.Port))
+		logger.Log.Info("Server listening on :8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Log.Fatal("Listen error", zap.Error(err))
 		}
@@ -172,34 +127,15 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-
-	logger.Log.Info("Shutting down server...")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		logger.Log.Fatal("Server forced to shutdown", zap.Error(err))
-	}
-
-	logger.Log.Info("Server exited gracefully")
+	srv.Shutdown(ctx)
 }
 
 func runMigrations(repo *repository.Repository, migrationDir string) {
 	driver, err := sqlite.WithInstance(repo.DB(), &sqlite.Config{})
-	if err != nil {
-		logger.Log.Fatal("Migration driver error", zap.Error(err))
-	}
-
-	m, err := migrate.NewWithDatabaseInstance(
-		fmt.Sprintf("file://%s", migrationDir),
-		"sqlite", driver)
-	if err != nil {
-		logger.Log.Fatal("Migration init error", zap.Error(err))
-	}
-
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		logger.Log.Fatal("Migration failed", zap.Error(err))
-	}
-	logger.Log.Info("Migrations applied successfully")
+	if err != nil { return }
+	m, err := migrate.NewWithDatabaseInstance(fmt.Sprintf("file://%s", migrationDir), "sqlite", driver)
+	if err != nil { return }
+	m.Up()
 }
