@@ -38,41 +38,32 @@ func main() {
 
 	logger.Log.Info("Starting BuildingMesh Backend", zap.String("env", cfg.Environment))
 
-	// Database
-	repo, err := repository.NewRepository(cfg.DBPath)
-	if err != nil {
-		logger.Log.Fatal("Failed to connect to DB", zap.Error(err))
-	}
+	repo, _ := repository.NewRepository(cfg.DBPath)
 	defer repo.Close()
 	runMigrations(repo, "migrations")
 
-	// Twenty CRM Client (Headless Metadata Engine)
 	twentyClient := twenty.NewClient(os.Getenv("TWENTY_API_URL"), os.Getenv("TWENTY_API_KEY"))
-
-	// Services
 	projectSvc := service.NewProjectService(repo, twentyClient)
+	storageSvc := service.NewLocalFileStorage("./uploads")
 
-	// Infrastructure
 	redisCache, _ := cache.NewCache(cfg.RedisURL)
 	rabbitQueue, _ := queue.NewQueue(cfg.RabbitMQURL)
+	rabbitQueue.StartWorker(context.Background())
 
-	h := handlers.NewHandler(repo, rabbitQueue, redisCache, projectSvc)
+	h := handlers.NewHandler(repo, rabbitQueue, redisCache, projectSvc, storageSvc)
 	r := chi.NewRouter()
 
-	// Middlewares
 	r.Use(middleware.Recovery)
 	r.Use(chimiddleware.RequestID)
-	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Logger)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: cfg.AllowedOrigins,
+		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
 	}))
 
 	limiter := middleware.NewIPRateLimiter(1, 5)
 
-	// API Routes
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/login", h.Login)
 		r.Get("/health/live", h.HealthLive)
@@ -95,18 +86,17 @@ func main() {
 				r.Use(middleware.RequireRole("Superadmin", "Admin", "Engineer"))
 				r.Get("/projects", h.GetProjects)
 				r.Post("/projects", h.CreateProject)
+				r.Get("/organizations/{orgID}/usage", h.GetOrgUsage)
 				r.Get("/projects/{projectID}/elements", h.GetBIMElements)
 				r.Post("/commits", h.CreateInspectionCommit)
+				r.Post("/projects/{projectID}/splats", h.UploadSplat)
 				r.Get("/projects/{projectID}/export", h.ExportProjectPDF)
 			})
 		})
 	})
 
-	// Static SPA
 	webDir := filepath.Join(".", "backend/cmd/server/web")
-	if _, err := os.Stat(webDir); os.IsNotExist(err) {
-		webDir = filepath.Join(".", "cmd/server/web")
-	}
+	if _, err := os.Stat(webDir); os.IsNotExist(err) { webDir = filepath.Join(".", "cmd/server/web") }
 
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, ".") {
@@ -119,23 +109,17 @@ func main() {
 	srv := &http.Server{Addr: ":8080", Handler: r}
 	go func() {
 		logger.Log.Info("Server listening on :8080")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Log.Fatal("Listen error", zap.Error(err))
-		}
+		srv.ListenAndServe()
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	srv.Shutdown(ctx)
+	srv.Shutdown(context.Background())
 }
 
 func runMigrations(repo *repository.Repository, migrationDir string) {
-	driver, err := sqlite.WithInstance(repo.DB(), &sqlite.Config{})
-	if err != nil { return }
-	m, err := migrate.NewWithDatabaseInstance(fmt.Sprintf("file://%s", migrationDir), "sqlite", driver)
-	if err != nil { return }
+	driver, _ := sqlite.WithInstance(repo.DB(), &sqlite.Config{})
+	m, _ := migrate.NewWithDatabaseInstance(fmt.Sprintf("file://%s", migrationDir), "sqlite", driver)
 	m.Up()
 }
